@@ -1,29 +1,131 @@
 # Firmeza — Enterprise Inventory Management
 
-Sistema integral diseñado para el control de inventarios de alta densidad, trazabilidad inalterable de SKU y analítica logística en tiempo real. La arquitectura del sistema desacopla por completo la interfaz de usuario en un cliente web reactivo desarrollado con **Angular**, de un backend robusto y concurrente construido en **.NET Core**, respaldado por **PostgreSQL** para la persistencia relacional.
+[![Angular](https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.dev/)
+[![.NET Core](https://img.shields.io/badge/.NET_Core-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![C#](https://img.shields.io/badge/C%23-239120?style=for-the-badge&logo=c-sharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
+
+Sistema industrial de control de inventarios, trazabilidad de SKUs y telemetría logística. Arquitectura desacoplada basada en un frontend reactivo con **Angular Standalone Components** y un backend concurrente en **.NET Core Web API**, persistido sobre **PostgreSQL**.
 
 ---
 
-## 🏗 Arquitectura del Repositorio
-
-El proyecto se estructura bajo un esquema monorepo modular:
+## 🏗 Arquitectura del Monorepo
 
 ```text
-.
+Firmeza/
 ├── API/
-│   └── Firmeza/       # Backend en .NET Core (Web API, controladores, autenticación y EF Core)
-├── client/            # Frontend en Angular (Standalone Components, RxJS, HttpClient)
-├── .gitignore         # Exclusión de binarios, dependencias y carpetas de entorno
-└── README.md          # Documentación técnica general
-🚀 Stack TecnológicoFrontend (client/)Framework: Angular (Arquitectura orientada a componentes independientes — Standalone Components)Lenguaje: TypeScriptManejo de Estado y Peticiones: RxJS y HttpClient con el patrón funcional inject()Estilizado: CSS3 estructurado y encapsulado por componenteBackend (API/Firmeza/)Plataforma: .NET Core Web APILenguaje: C#ORM: Entity Framework CoreBase de Datos: PostgreSQLSeguridad: Cifrado TLS 1.3, hashing de credenciales y autenticación mediante JWT📁 Distribución del Cliente Web (client/src/app/)Views/: Módulos y vistas principales:Home/Home.Component.ts: Landing page con telemetría en vivo, visualización de métricas y presentación de infraestructura.Auth/:Login.Component.ts: Terminal de acceso con validación de credenciales corporativas y selección de nodos de distribución.Register.Component.ts: Formulario para el alta de nuevas organizaciones empresariales, registros fiscales y configuración operativa.Dashboard/: Consola operativa para supervisión de racks, bahías y existencias críticas.Services/:Api.Service.ts: Capa de abstracción HTTP para el consumo de endpoints hacia http://localhost:5235/api/auth.router/ & app.routes.ts: Definición centralizada del sistema de rutas para navegación SPA.⚙️ Configuración y Ejecución LocalPrerrequisitos.NET SDKNode.js & npmAngular CLI (npm install -g @angular/cli)Instancia en ejecución de PostgreSQL (puerto 5432)1. Puesta en Marcha del Backend (.NET)Dirígete a la carpeta del backend:Bashcd API/Firmeza
-Configura los parámetros de acceso a PostgreSQL en el archivo appsettings.json:JSON"ConnectionStrings": {
-  "DefaultConnection": "Host=localhost;Port=5432;Database=firmeza_db;Username=postgres;Password=tu_contraseña"
-}
-Aplica las migraciones del modelo de datos:Bashdotnet ef database update
-Inicia la API:Bashdotnet run
-El servidor quedará a la escucha en el puerto http://localhost:5235.2. Puesta en Marcha del Frontend (Angular)Abre una terminal y sitúate en el directorio cliente:Bashcd client
-Instala las dependencias del proyecto:Bashnpm install
-Levanta el servidor de desarrollo local:Bashng serve
-Ingresa desde el navegador a:Plaintexthttp://localhost:4200
-🔒 Endpoints de Autenticación (/api/auth)VerboRutaEntradaSalida esperadaPropósitoPOST/api/auth/logincredentials: { email, password }Token JWT / Mensaje de sesiónValidación de operadores y asignación de credencialesPOST/api/auth/registeruserData: { name, email, password }Confirmación de registroAlta de organizaciones y cuentas corporativasGET/api/auth/home-dataNingunaMétricas y telemetría de loteCarga de indicadores operacionales para la vista principal
-<FollowUp label="¿Quieres que añadamos los comandos para crear el archivo README.md directam
+│   └── Firmeza/                    # Backend en .NET Core Web API
+│       ├── Controllers/            # Controladores REST (Auth, Home, Stock)
+│       ├── Models/                 # Entidades y DTOs de dominio
+│       ├── Data/                   # Contexto de Entity Framework Core
+│       └── appsettings.json        # Cadenas de conexión y configuración
+├── client/                         # Frontend en Angular
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── Components/         # Componentes UI reutilizables
+│   │   │   ├── Services/           # Servicios HTTP (Api.Service.ts)
+│   │   │   ├── Views/              # Vistas principales
+│   │   │   │   ├── Auth/           # Login.Component.ts, Register.Component.ts
+│   │   │   │   ├── Dashboard/      # Consola operativa de almacenes
+│   │   │   │   └── Home/           # Home.Component.ts (Landing & telemetría)
+│   │   │   ├── router/             # Módulos y configuración de rutas
+│   │   │   ├── app.routes.ts       # Definición de rutas principales
+│   │   │   └── app.config.ts       # Proveedores globales (provideHttpClient)
+│   │   └── main.ts                 # Bootstrap de la aplicación Angular
+└── README.md
+```
+
+---
+
+## 🚀 Stack Tecnológico
+
+### Frontend
+- **Framework:** Angular (Standalone Components)
+- **Lenguaje:** TypeScript
+- **Consumo HTTP:** `HttpClient` con patrón `inject()` y programación reactiva mediante `RxJS`
+- **Estilos:** CSS3 nativo encapsulado con paleta industrial
+
+### Backend
+- **Framework:** .NET Core Web API
+- **Lenguaje:** C#
+- **ORM:** Entity Framework Core
+- **Base de Datos:** PostgreSQL
+- **Seguridad:** Cifrado TLS 1.3, autenticación con JWT / Identity
+
+---
+
+## ⚙️ Puesta en Marcha en Local
+
+### Prerrequisitos
+- [.NET SDK](https://dotnet.microsoft.com/download)
+- [Node.js](https://nodejs.org/) (versión LTS recomendada)
+- [Angular CLI](https://angular.dev/) (`npm install -g @angular/cli`)
+- [PostgreSQL](https://www.postgresql.org/) en ejecución en el puerto `5432` (nativo o contenedor Docker)
+
+---
+
+### 1. Configurar y Levantar el Backend (.NET)
+
+1. Ingresar al directorio del backend:
+   ```bash
+   cd API/Firmeza
+   ```
+
+2. Configurar la cadena de conexión en `appsettings.json`:
+   ```json
+   "ConnectionStrings": {
+     "DefaultConnection": "Host=localhost;Port=5432;Database=firmeza_db;Username=postgres;Password=tu_contraseña"
+   }
+   ```
+
+3. Aplicar las migraciones a la base de datos:
+   ```bash
+   dotnet ef database update
+   ```
+
+4. Ejecutar la API:
+   ```bash
+   dotnet run
+   ```
+   *El servidor quedará disponible por defecto en:* `http://localhost:5235`
+
+---
+
+### 2. Configurar y Levantar el Frontend (Angular)
+
+1. Abrir otra terminal e ingresar a la carpeta del cliente:
+   ```bash
+   cd client
+   ```
+
+2. Instalar las dependencias de Node:
+   ```bash
+   npm install
+   ```
+
+3. Levantar el servidor de desarrollo:
+   ```bash
+   ng serve
+   ```
+
+4. Abrir la aplicación en el navegador:
+   ```text
+   http://localhost:4200
+   ```
+
+---
+
+## 🔒 Especificación de Endpoints (`/api/auth`)
+
+| Método | Endpoint | Payload / Parámetros | Respuesta esperada | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/login` | `{ "email": "...", "password": "..." }` | `200 OK` (Token / Mensaje) | Valida credenciales corporativas de operadores |
+| `POST` | `/api/auth/register` | `{ "name": "...", "email": "...", "password": "..." }` | `201 Created` / `200 OK` | Registra nuevas organizaciones y accesos |
+| `GET` | `/api/auth/home-data` | *Ninguno* | `200 OK` (JSON telemetría) | Retorna datos e indicadores para la vista Home |
+
+---
+
+## 📄 Licencia
+
+Distribuido bajo licencia propietaria para el ecosistema **Firmeza Technologies Inc.** Todos los derechos reservados.
