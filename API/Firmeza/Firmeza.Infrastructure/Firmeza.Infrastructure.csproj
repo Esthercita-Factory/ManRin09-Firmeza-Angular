@@ -4,7 +4,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <RootNamespace>Firmeza.Infraestructure</RootNamespace>
+        <RootNamespace>Firmeza.Infrastructure</RootNamespace>
     </PropertyGroup>
 
 
@@ -15,7 +15,14 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.11" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Firmeza.Application\Firmeza.Application.csproj" />
+        <ProjectReference Include="..\Firmeza.Domain\Firmeza.Domain.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -24,7 +31,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DbContext\DataConfiguration\" />
+      <Folder Include="DbContext\Configurations\" />
       <Folder Include="Repositories\" />
     </ItemGroup>
 

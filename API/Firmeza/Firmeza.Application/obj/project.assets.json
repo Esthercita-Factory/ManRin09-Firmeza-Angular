@@ -81,6 +81,35 @@
           }
         }
       },
+      "Microsoft.AspNetCore.Cryptography.Internal/10.0.12": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/Microsoft.AspNetCore.Cryptography.Internal.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.AspNetCore.Cryptography.Internal.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Microsoft.AspNetCore.Cryptography.KeyDerivation/10.0.12": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.AspNetCore.Cryptography.Internal": "10.0.12"
+        },
+        "compile": {
+          "lib/net10.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.AspNetCore.Metadata/10.0.11": {
         "type": "package",
         "compile": {
@@ -336,6 +365,19 @@
             "related": ".xml"
           }
         }
+      },
+      "Firmeza.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.Web": "10.0.11"
+        },
+        "compile": {
+          "bin/placeholder/Firmeza.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Firmeza.Domain.dll": {}
+        }
       }
     }
   },
@@ -418,6 +460,44 @@
         "lib/net10.0/Microsoft.AspNetCore.Components.Web.xml",
         "microsoft.aspnetcore.components.web.10.0.11.nupkg.sha512",
         "microsoft.aspnetcore.components.web.nuspec"
+      ]
+    },
+    "Microsoft.AspNetCore.Cryptography.Internal/10.0.12": {
+      "sha512": "6i8dT0QU94k6fPkxDAvOUETum2INkULnO60bHAUQU74S+FAq69IU/78HPsnfSV214nivwJuNuJf9R4cPd9K8Rg==",
+      "type": "package",
+      "path": "microsoft.aspnetcore.cryptography.internal/10.0.12",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "THIRD-PARTY-NOTICES.TXT",
+        "lib/net10.0/Microsoft.AspNetCore.Cryptography.Internal.dll",
+        "lib/net10.0/Microsoft.AspNetCore.Cryptography.Internal.xml",
+        "lib/net462/Microsoft.AspNetCore.Cryptography.Internal.dll",
+        "lib/net462/Microsoft.AspNetCore.Cryptography.Internal.xml",
+        "lib/netstandard2.0/Microsoft.AspNetCore.Cryptography.Internal.dll",
+        "lib/netstandard2.0/Microsoft.AspNetCore.Cryptography.Internal.xml",
+        "microsoft.aspnetcore.cryptography.internal.10.0.12.nupkg.sha512",
+        "microsoft.aspnetcore.cryptography.internal.nuspec"
+      ]
+    },
+    "Microsoft.AspNetCore.Cryptography.KeyDerivation/10.0.12": {
+      "sha512": "nlzGX5486fMAHH9nIoIQd6bFg1rITB+oks/Sm3E/J+906Gs3fWYcz0OG/7a6inuOuTNOrwpPjt0HFjgQS6L8nA==",
+      "type": "package",
+      "path": "microsoft.aspnetcore.cryptography.keyderivation/10.0.12",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "THIRD-PARTY-NOTICES.TXT",
+        "lib/net10.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.dll",
+        "lib/net10.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.xml",
+        "lib/net462/Microsoft.AspNetCore.Cryptography.KeyDerivation.dll",
+        "lib/net462/Microsoft.AspNetCore.Cryptography.KeyDerivation.xml",
+        "lib/netstandard2.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.dll",
+        "lib/netstandard2.0/Microsoft.AspNetCore.Cryptography.KeyDerivation.xml",
+        "microsoft.aspnetcore.cryptography.keyderivation.10.0.12.nupkg.sha512",
+        "microsoft.aspnetcore.cryptography.keyderivation.nuspec"
       ]
     },
     "Microsoft.AspNetCore.Metadata/10.0.11": {
@@ -861,11 +941,18 @@
         "microsoft.jsinterop.10.0.11.nupkg.sha512",
         "microsoft.jsinterop.nuspec"
       ]
+    },
+    "Firmeza.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Firmeza.Domain/Firmeza.Domain.csproj",
+      "msbuildProject": "../Firmeza.Domain/Firmeza.Domain.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
+      "Firmeza.Domain >= 1.0.0",
       "Microsoft.AspNetCore.Components.Web >= 10.0.11",
+      "Microsoft.AspNetCore.Cryptography.KeyDerivation >= 10.0.12",
       "Microsoft.Extensions.DependencyInjection.Abstractions >= 10.0.12"
     ]
   },
@@ -894,7 +981,11 @@
         "net10.0": {
           "framework": "net10.0",
           "targetAlias": "net10.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
+              "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj"
+            }
+          }
         }
       },
       "warningProperties": {
@@ -917,6 +1008,10 @@
           "Microsoft.AspNetCore.Components.Web": {
             "target": "Package",
             "version": "[10.0.11, )"
+          },
+          "Microsoft.AspNetCore.Cryptography.KeyDerivation": {
+            "target": "Package",
+            "version": "[10.0.12, )"
           },
           "Microsoft.Extensions.DependencyInjection.Abstractions": {
             "target": "Package",

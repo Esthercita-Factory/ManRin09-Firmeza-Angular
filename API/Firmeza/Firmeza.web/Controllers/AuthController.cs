@@ -1,3 +1,5 @@
+using Firmeza.Application.DTOs;
+using Firmeza.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Firmeza.web.Controllers;
@@ -6,6 +8,15 @@ namespace Firmeza.web.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private readonly IAuthService _authService;
+    private readonly ITokenService _tokenService;
+
+    public AuthController(IAuthService authService, ITokenService tokenService)
+    {
+        _authService = authService;
+        _tokenService = tokenService;
+    }
+
     [HttpGet("home-data")]
     public IActionResult GetHomeData()
     {
@@ -18,22 +29,72 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginTestRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
-        if (request.Email == "test@firmeza.com" && request.Password == "123456")
+        var result = await _authService.LoginAsync(request.Email, request.Password);
+
+        if (!result.Success)
         {
-            return Ok(new { token = "token_de_prueba_jwt_12345", usuario = request.Email });
+            return Unauthorized(new { message = result.ErrorMessage ?? "Credenciales inválidas." });
         }
 
-        return Unauthorized(new { mensaje = "Credenciales incorrectas (Usa: test@firmeza.com / 123456)" });
+        var token = _tokenService.GenerateToken(result.UserId, result.Email, result.Role, result.Name);
+
+        return Ok(new
+        {
+            token,
+            id = result.UserId,
+            email = result.Email,
+            name = result.Name,
+            role = result.Role,
+            user = new
+            {
+                id = result.UserId,
+                email = result.Email,
+                name = result.Name,
+                role = result.Role
+            }
+        });
     }
 
-    [HttpPost("register")]
-    public IActionResult Register([FromBody] RegisterTestRequest request)
+    [HttpPost("register/enterprise")]
+    public async Task<IActionResult> RegisterEnterprise([FromBody] RegisterEnterpriseDto request)
     {
-        return Ok(new { mensaje = $"Usuario {request.Nombre} registrado correctamente con email {request.Email}" });
+        try
+        {
+            await _authService.RegisterEnterpriseAsync(
+                request.BusinessName,
+                request.TaxId,
+                request.ContactName,
+                request.CorporateEmail,
+                request.CorporatePhone,
+                request.Password);
+
+            return StatusCode(StatusCodes.Status201Created, new { message = "Empresa registrada exitosamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("register/client")]
+    public async Task<IActionResult> RegisterClient([FromBody] RegisterClientDto request)
+    {
+        try
+        {
+            await _authService.RegisterClientAsync(
+                request.FirstName,
+                request.LastName,
+                request.Email,
+                request.Phone,
+                request.Password);
+
+            return StatusCode(StatusCodes.Status201Created, new { message = "Cliente registrado exitosamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 }
-
-public record LoginTestRequest(string Email, string Password);
-public record RegisterTestRequest(string Nombre, string Email, string Password);

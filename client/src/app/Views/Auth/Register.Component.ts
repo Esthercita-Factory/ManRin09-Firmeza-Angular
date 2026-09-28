@@ -35,13 +35,17 @@ import { ApiService } from '../../Services/Api.Service';
           <div class="left-panel">
             <div class="left-header">
               <span class="nodo-tag">ALTA DE CUENTA</span>
-              <span class="version-tag">REGISTRO CORPORATIVO</span>
+              <span class="version-tag">{{ accountType === 'empresa' ? 'REGISTRO CORPORATIVO' : 'CUENTA PERSONAL' }}</span>
             </div>
 
             <div class="left-content">
               <span class="section-tag">PLATAFORMA INTEGRAL</span>
               <h1>Empieza a gestionar tu inventario con precisión</h1>
-              <p>Habilita la sincronización de existencias, control de almacenes y reportes operacionales en una sola plataforma.</p>
+              <p>
+                {{ accountType === 'empresa' 
+                  ? 'Habilita la sincronización de existencias, control de almacenes y reportes operacionales para tu organización.' 
+                  : 'Administra tus existencias, pedidos personales y catálogo de productos con total facilidad.' }}
+              </p>
 
               <div class="sync-card">
                 <div class="sync-icon">
@@ -86,64 +90,161 @@ import { ApiService } from '../../Services/Api.Service';
 
             <div class="form-intro">
               <h2 class="form-title">Crear Cuenta</h2>
-              <p class="form-subtitle">Completa el formulario para registrar a tu organización.</p>
+              <p class="form-subtitle">
+                {{ accountType === 'empresa' 
+                  ? 'Completa el formulario para registrar a tu organización.' 
+                  : 'Completa tus datos personales para crear tu cuenta.' }}
+              </p>
             </div>
 
             <form (submit)="onRegisterSubmit($event)" class="register-form">
-              <div class="form-row-2">
-                <div class="form-group">
-                  <label>Organización / Empresa</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                      </svg>
-                    </span>
-                    <input type="text" placeholder="Ej. Logística Global S.A." />
+              <!-- Selector de Tipo de Registro (Empresa o Persona Natural) -->
+              <div class="form-group">
+                <label>Tipo de Registro</label>
+                <div class="input-select-wrapper">
+                  <span class="input-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                  </span>
+                  <select name="accountType" [(ngModel)]="accountType">
+                    <option value="empresa">Empresa</option>
+                    <option value="persona">Persona Natural</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- ================= CAMPOS: PERSONA NATURAL ================= -->
+              <ng-container *ngIf="accountType === 'persona'">
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label>Nombre</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                      </span>
+                      <input type="text" name="firstName" [(ngModel)]="firstName" placeholder="Ej. Juan" required />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Apellido</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                      </span>
+                      <input type="text" name="lastName" [(ngModel)]="lastName" placeholder="Ej. Pérez" required />
+                    </div>
                   </div>
                 </div>
 
                 <div class="form-group">
-                  <label>Identificador Fiscal / RFC</label>
+                  <label>Correo Electrónico</label>
                   <div class="input-wrapper">
                     <span class="input-icon">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
                       </svg>
                     </span>
-                    <input type="text" placeholder="Ej. LGL240101-XX1" />
+                    <input type="email" name="email" [(ngModel)]="email" placeholder="juan.perez@correo.com" required />
                   </div>
                 </div>
-              </div>
 
-              <div class="form-group">
-                <label>Nombre Completo del Responsable</label>
-                <div class="input-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                  </span>
-                  <input type="text" name="name" [(ngModel)]="name" placeholder="Ej. Carlos Mendoza" required />
+                <div class="form-group">
+                  <label>Número de Teléfono</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                      </svg>
+                    </span>
+                    <input type="tel" name="phone" [(ngModel)]="phone" placeholder="Ej. +57 300 123 4567" required />
+                  </div>
                 </div>
-              </div>
+              </ng-container>
 
-              <div class="form-group">
-                <label>Correo Electrónico Corporativo</label>
-                <div class="input-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                  </span>
-                  <input type="email" name="email" [(ngModel)]="email" placeholder="carlos@empresa.com" required />
+              <!-- ================= CAMPOS: EMPRESA ================= -->
+              <ng-container *ngIf="accountType === 'empresa'">
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label>Organización / Empresa</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                      </span>
+                      <input type="text" name="companyName" [(ngModel)]="companyName" placeholder="Ej. Logística Global S.A." required />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Identificador Fiscal / RFC / NIT</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                      </span>
+                      <input type="text" name="taxId" [(ngModel)]="taxId" placeholder="Ej. LGL240101-XX1" required />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
+                <div class="form-group">
+                  <label>Nombre Completo del Responsable</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </span>
+                    <input type="text" name="name" [(ngModel)]="name" placeholder="Ej. Carlos Mendoza" required />
+                  </div>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label>Correo Corporativo</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                          <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                      </span>
+                      <input type="email" name="email" [(ngModel)]="email" placeholder="carlos@empresa.com" required />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Teléfono Corporativo</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                      </span>
+                      <input type="tel" name="phone" [(ngModel)]="phone" placeholder="Ej. +57 601 234 5678" />
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ================= CONTRASEÑAS (COMÚN A AMBOS) ================= -->
               <div class="form-row-2">
                 <div class="form-group">
                   <label>Contraseña</label>
@@ -167,26 +268,8 @@ import { ApiService } from '../../Services/Api.Service';
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                       </svg>
                     </span>
-                    <input type="password" placeholder="Repite tu contraseña" />
+                    <input type="password" name="confirmPassword" [(ngModel)]="confirmPassword" placeholder="Repite tu contraseña" required />
                   </div>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Tipo de Operación Principal</label>
-                <div class="input-select-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                  </span>
-                  <select>
-                    <option>Centro de Distribución y Almacenaje</option>
-                    <option>Manufactura y Materias Primas</option>
-                    <option>Retail y Comercio Minorista / Mayorista</option>
-                    <option>Otros sectores industriales</option>
-                  </select>
                 </div>
               </div>
 
@@ -246,7 +329,7 @@ import { ApiService } from '../../Services/Api.Service';
       display: flex; 
       flex-direction: column; 
       min-height: 100vh; 
-      animation: fadeIn 0.35s ease-out;
+      animation: fadeIn 0.35s ease-out; 
     }
 
     .top-navbar { 
@@ -262,16 +345,16 @@ import { ApiService } from '../../Services/Api.Service';
       display: flex; 
       align-items: center; 
       gap: 0.75rem; 
-      text-decoration: none;
+      text-decoration: none; 
     }
 
     .brand-icon { 
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
       color: #1d4ed8; 
       background: #eff6ff; 
-      border: 1px solid #dbeafe;
+      border: 1px solid #dbeafe; 
       padding: 0.35rem 0.55rem; 
       border-radius: 8px; 
     }
@@ -286,7 +369,7 @@ import { ApiService } from '../../Services/Api.Service';
       font-size: 1.05rem; 
       letter-spacing: -0.025em; 
       color: #0f172a; 
-      line-height: 1.1;
+      line-height: 1.1; 
     }
 
     .brand-sub { 
@@ -306,14 +389,14 @@ import { ApiService } from '../../Services/Api.Service';
       color: #475569; 
       font-size: 0.88rem; 
       font-weight: 600; 
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
-      transition: all 0.2s ease;
+      padding: 0.4rem 0.75rem; 
+      border-radius: 6px; 
+      transition: all 0.2s ease; 
     }
 
     .nav-links a:hover { 
       color: #1d4ed8; 
-      background: #f1f5f9;
+      background: #f1f5f9; 
     }
 
     .register-container { 
@@ -357,17 +440,17 @@ import { ApiService } from '../../Services/Api.Service';
       font-weight: 700; 
       color: #38bdf8; 
       background: rgba(56, 189, 248, 0.12); 
-      border: 1px solid rgba(56, 189, 248, 0.25);
+      border: 1px solid rgba(56, 189, 248, 0.25); 
       padding: 0.3rem 0.75rem; 
       border-radius: 20px; 
-      letter-spacing: 0.04em;
+      letter-spacing: 0.04em; 
     }
 
     .version-tag { 
       font-size: 0.68rem; 
       color: #94a3b8; 
-      font-weight: 600;
-      letter-spacing: 0.04em;
+      font-weight: 600; 
+      letter-spacing: 0.04em; 
     }
 
     .section-tag { 
@@ -385,7 +468,7 @@ import { ApiService } from '../../Services/Api.Service';
       line-height: 1.25; 
       margin-bottom: 0.85rem; 
       color: #f8fafc; 
-      letter-spacing: -0.025em;
+      letter-spacing: -0.025em; 
     }
 
     .left-content p { 
@@ -415,7 +498,7 @@ import { ApiService } from '../../Services/Api.Service';
       display: flex; 
       align-items: center; 
       justify-content: center; 
-      flex-shrink: 0;
+      flex-shrink: 0; 
     }
 
     .sync-details { flex: 1; }
@@ -443,14 +526,14 @@ import { ApiService } from '../../Services/Api.Service';
       color: #94a3b8; 
       display: block; 
       margin-bottom: 0.35rem; 
-      letter-spacing: 0.05em;
+      letter-spacing: 0.05em; 
     }
 
     .stat-value { 
       font-size: 1.35rem; 
       font-weight: 800; 
       color: #ffffff; 
-      line-height: 1.1;
+      line-height: 1.1; 
     }
 
     .stat-trend { 
@@ -473,7 +556,7 @@ import { ApiService } from '../../Services/Api.Service';
     .left-footer { 
       font-size: 0.72rem; 
       color: #64748b; 
-      line-height: 1.5;
+      line-height: 1.5; 
     }
 
     .right-panel { 
@@ -501,21 +584,21 @@ import { ApiService } from '../../Services/Api.Service';
       font-size: 0.7rem; 
       font-weight: 700; 
       color: #16a34a; 
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      padding: 0.2rem 0.55rem;
-      border-radius: 6px;
+      background: #f0fdf4; 
+      border: 1px solid #bbf7d0; 
+      padding: 0.2rem 0.55rem; 
+      border-radius: 6px; 
     }
 
-    .form-intro {
-      margin-bottom: 1.5rem;
+    .form-intro { 
+      margin-bottom: 1.25rem; 
     }
 
     .form-title { 
       font-size: 1.85rem; 
       font-weight: 800; 
       color: #0f172a; 
-      letter-spacing: -0.03em;
+      letter-spacing: -0.03em; 
       margin-bottom: 0.35rem; 
     }
 
@@ -556,19 +639,19 @@ import { ApiService } from '../../Services/Api.Service';
       border-radius: 10px; 
       padding: 0.68rem 0.85rem; 
       gap: 0.65rem; 
-      transition: all 0.2s ease;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s ease; 
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02); 
     }
 
-    .input-wrapper:focus-within, .input-select-wrapper:focus-within {
-      border-color: #2563eb;
-      background: #ffffff;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    .input-wrapper:focus-within, .input-select-wrapper:focus-within { 
+      border-color: #2563eb; 
+      background: #ffffff; 
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); 
     }
 
     .input-icon { 
-      display: flex;
-      align-items: center;
+      display: flex; 
+      align-items: center; 
       color: #64748b; 
     }
 
@@ -579,7 +662,11 @@ import { ApiService } from '../../Services/Api.Service';
       width: 100%; 
       font-size: 0.88rem; 
       color: #0f172a; 
-      font-family: inherit;
+      font-family: inherit; 
+    }
+
+    select { 
+      cursor: pointer; 
     }
 
     .checkbox-group { 
@@ -601,21 +688,21 @@ import { ApiService } from '../../Services/Api.Service';
     }
     .checkbox-group a:hover { text-decoration: underline; }
 
-    .feedback-msg {
-      padding: 0.85rem 1.1rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      animation: fadeIn 0.3s ease-out;
+    .feedback-msg { 
+      padding: 0.85rem 1.1rem; 
+      border-radius: 8px; 
+      font-size: 0.85rem; 
+      animation: fadeIn 0.3s ease-out; 
     }
-    .success-box {
-      background: #f0fdf4;
-      border: 1px solid #86efac;
-      color: #166534;
+    .success-box { 
+      background: #f0fdf4; 
+      border: 1px solid #86efac; 
+      color: #166534; 
     }
-    .error-box {
-      background: #fef2f2;
-      border: 1px solid #fca5a5;
-      color: #991b1b;
+    .error-box { 
+      background: #fef2f2; 
+      border: 1px solid #fca5a5; 
+      color: #991b1b; 
     }
 
     .btn-submit { 
@@ -629,18 +716,18 @@ import { ApiService } from '../../Services/Api.Service';
       cursor: pointer; 
       margin-top: 0.25rem; 
       box-shadow: 0 4px 12px -2px rgba(29, 78, 216, 0.35); 
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); 
     }
 
     .btn-submit:hover:not(:disabled) { 
       background: #1e40af; 
-      transform: translateY(-1px);
-      box-shadow: 0 8px 16px -2px rgba(29, 78, 216, 0.45);
+      transform: translateY(-1px); 
+      box-shadow: 0 8px 16px -2px rgba(29, 78, 216, 0.45); 
     }
 
-    .btn-submit:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
+    .btn-submit:disabled { 
+      opacity: 0.7; 
+      cursor: not-allowed; 
     }
 
     .login-link { 
@@ -696,9 +783,23 @@ import { ApiService } from '../../Services/Api.Service';
   `]
 })
 export class RegisterComponent implements OnInit {
+  accountType: 'empresa' | 'persona' = 'empresa';
+
+  // Datos Persona Natural
+  firstName = '';
+  lastName = '';
+
+  // Datos Empresa
+  companyName = '';
+  taxId = '';
+
+  // Datos Comunes
   name = '';
   email = '';
+  phone = '';
   password = '';
+  confirmPassword = '';
+
   isLoading = false;
   registerMessage: string | null = null;
   registerError: string | null = null;
@@ -711,13 +812,33 @@ export class RegisterComponent implements OnInit {
     event.preventDefault();
     this.registerError = null;
     this.registerMessage = null;
+
+    if (this.password !== this.confirmPassword) {
+      this.registerError = 'Las contraseñas no coinciden.';
+      return;
+    }
+
     this.isLoading = true;
 
-    const userData = {
-      name: this.name,
-      email: this.email,
-      password: this.password
-    };
+    const userData = this.accountType === 'persona'
+      ? {
+          accountType: 'persona',
+          firstName: this.firstName,
+          lastName: this.lastName,
+          name: `${this.firstName} ${this.lastName}`.trim(),
+          email: this.email,
+          phone: this.phone,
+          password: this.password
+        }
+      : {
+          accountType: 'empresa',
+          companyName: this.companyName,
+          taxId: this.taxId,
+          name: this.name,
+          email: this.email,
+          phone: this.phone,
+          password: this.password
+        };
 
     this.apiService.register(userData).subscribe({
       next: (response: any) => {
