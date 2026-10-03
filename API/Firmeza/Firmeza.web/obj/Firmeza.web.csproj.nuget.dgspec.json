@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.web\\Firmeza.web.csproj": {}
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.web/Firmeza.web.csproj": {}
   },
   "projects": {
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj": {
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj",
+        "projectUniqueName": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj",
         "projectName": "Firmeza.Application",
-        "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj",
-        "packagesPath": "C:\\Users\\pc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\obj\\",
+        "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj",
+        "packagesPath": "/home/dozen_apollo/.nuget/packages/",
+        "outputPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\pc\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/home/dozen_apollo/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -27,8 +27,8 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj"
               }
             }
           }
@@ -43,7 +43,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
@@ -54,11 +54,11 @@
               "target": "Package",
               "version": "[10.0.11, )"
             },
-            "Microsoft.AspNetCore.Cryptography.KeyDerivation": {
+            "Microsoft.Extensions.DependencyInjection.Abstractions": {
               "target": "Package",
               "version": "[10.0.12, )"
             },
-            "Microsoft.Extensions.DependencyInjection.Abstractions": {
+            "Microsoft.Extensions.Identity.Core": {
               "target": "Package",
               "version": "[10.0.12, )"
             }
@@ -79,7 +79,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/dozen_apollo/.dotnet/sdk/10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -357,17 +357,17 @@
         }
       }
     },
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj",
+        "projectUniqueName": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj",
         "projectName": "Firmeza.Domain",
-        "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj",
-        "packagesPath": "C:\\Users\\pc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\obj\\",
+        "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj",
+        "packagesPath": "/home/dozen_apollo/.nuget/packages/",
+        "outputPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\pc\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/home/dozen_apollo/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -392,7 +392,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
@@ -402,6 +402,10 @@
             "Microsoft.AspNetCore.Components.Web": {
               "target": "Package",
               "version": "[10.0.11, )"
+            },
+            "Microsoft.Extensions.Identity.Stores": {
+              "target": "Package",
+              "version": "[10.0.12, )"
             }
           },
           "imports": [
@@ -420,7 +424,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/dozen_apollo/.dotnet/sdk/10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -698,17 +702,17 @@
         }
       }
     },
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\Firmeza.Infrastructure.csproj": {
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/Firmeza.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\Firmeza.Infrastructure.csproj",
+        "projectUniqueName": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/Firmeza.Infrastructure.csproj",
         "projectName": "Firmeza.Infrastructure",
-        "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\Firmeza.Infrastructure.csproj",
-        "packagesPath": "C:\\Users\\pc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\obj\\",
+        "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/Firmeza.Infrastructure.csproj",
+        "packagesPath": "/home/dozen_apollo/.nuget/packages/",
+        "outputPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\pc\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/home/dozen_apollo/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -721,11 +725,11 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj"
               },
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj"
               }
             }
           }
@@ -740,16 +744,24 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.2.0, )"
+            },
             "Microsoft.AspNetCore.Components.Web": {
               "target": "Package",
               "version": "[10.0.11, )"
+            },
+            "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[10.0.12, )"
             },
             "Microsoft.EntityFrameworkCore": {
               "target": "Package",
@@ -784,7 +796,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/dozen_apollo/.dotnet/sdk/10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -1062,17 +1074,17 @@
         }
       }
     },
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.web\\Firmeza.web.csproj": {
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.web/Firmeza.web.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.web\\Firmeza.web.csproj",
+        "projectUniqueName": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.web/Firmeza.web.csproj",
         "projectName": "Firmeza.web",
-        "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.web\\Firmeza.web.csproj",
-        "packagesPath": "C:\\Users\\pc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.web\\obj\\",
+        "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.web/Firmeza.web.csproj",
+        "packagesPath": "/home/dozen_apollo/.nuget/packages/",
+        "outputPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.web/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\pc\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/home/dozen_apollo/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -1085,14 +1097,14 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Application\\Firmeza.Application.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Application/Firmeza.Application.csproj"
               },
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj"
               },
-              "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\Firmeza.Infrastructure.csproj": {
-                "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Infrastructure\\Firmeza.Infrastructure.csproj"
+              "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/Firmeza.Infrastructure.csproj": {
+                "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Infrastructure/Firmeza.Infrastructure.csproj"
               }
             }
           }
@@ -1107,7 +1119,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
@@ -1127,6 +1139,10 @@
               "suppressParent": "All",
               "target": "Package",
               "version": "[10.0.12, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[10.2.3, )"
             }
           },
           "imports": [
@@ -1148,7 +1164,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/dozen_apollo/.dotnet/sdk/10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

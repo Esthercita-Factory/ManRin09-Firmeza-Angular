@@ -1,3 +1,3 @@
 ﻿<Project>
-  <Import Project="..\build\Firmeza.Infrastructure.props" />
+  <Import Project="../build/Firmeza.Infrastructure.props" />
 </Project>

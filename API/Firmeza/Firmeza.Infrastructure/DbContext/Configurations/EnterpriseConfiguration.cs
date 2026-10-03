@@ -25,7 +25,7 @@ public class EnterpriseConfiguration : IEntityTypeConfiguration<Enterprise>
 
         builder.Property(e => e.ContactName)
             .IsRequired()
-            .HasMaxLength(150);
+            .HasMaxLength(200);
 
         builder.Property(e => e.CorporateEmail)
             .IsRequired()
@@ -35,22 +35,32 @@ public class EnterpriseConfiguration : IEntityTypeConfiguration<Enterprise>
             .IsUnique();
 
         builder.Property(e => e.CorporatePhone)
-            .HasMaxLength(20);
+            .IsRequired()
+            .HasMaxLength(50);
 
         builder.Property(e => e.PasswordHash)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("text");
 
         builder.Property(e => e.CreatedAt)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(e => e.IsActive)
             .IsRequired();
 
-        // Relación uno a muchos: una empresa puede tener muchos clientes vinculados por EnterpriseId
+        // Relación 1:N con Client
         builder.HasMany(e => e.Clients)
             .WithOne(c => c.Enterprise)
             .HasForeignKey(c => c.EnterpriseId)
             .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Relación 1:1 con Identity (ApplicationUser)
+        builder.HasOne(e => e.User)
+            .WithOne(u => u.Enterprise)
+            .HasForeignKey<Enterprise>(e => e.UserId)
+            .OnDelete(DeleteBehavior.Cascade)
             .IsRequired(false);
     }
 }

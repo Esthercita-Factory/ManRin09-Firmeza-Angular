@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {}
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {}
   },
   "projects": {
-    "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj": {
+    "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj",
+        "projectUniqueName": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj",
         "projectName": "Firmeza.Domain",
-        "projectPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\Firmeza.Domain.csproj",
-        "packagesPath": "C:\\Users\\pc\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\pc\\Downloads\\Firmeza\\API\\Firmeza\\Firmeza.Domain\\obj\\",
+        "projectPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/Firmeza.Domain.csproj",
+        "packagesPath": "/home/dozen_apollo/.nuget/packages/",
+        "outputPath": "/home/dozen_apollo/Documentos/ManRin09-Firmeza-Angular/API/Firmeza/Firmeza.Domain/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\pc\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/home/dozen_apollo/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -39,7 +39,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
@@ -49,6 +49,10 @@
             "Microsoft.AspNetCore.Components.Web": {
               "target": "Package",
               "version": "[10.0.11, )"
+            },
+            "Microsoft.Extensions.Identity.Stores": {
+              "target": "Package",
+              "version": "[10.0.12, )"
             }
           },
           "imports": [
@@ -67,7 +71,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/dozen_apollo/.dotnet/sdk/10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

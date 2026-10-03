@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Firmeza.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260928012917_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260929201739_Client&EnterpriseDb")]
+    partial class ClientEnterpriseDb
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
