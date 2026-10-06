@@ -1,322 +1,14 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../Services/Api.Service';
+import { Router } from '@angular/router';
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="register-wrapper">
-      <header class="top-navbar">
-        <a href="/" class="brand">
-          <span class="brand-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </span>
-          <div class="brand-text">
-            <span class="brand-name">FIRMEZA</span>
-            <span class="brand-sub">INVENTORY PLATFORM</span>
-          </div>
-        </a>
-        <div class="nav-links">
-          <a href="/">Inicio</a>
-          <a href="/login">Iniciar Sesión</a>
-        </div>
-      </header>
-
-      <main class="register-container">
-        <div class="register-card">
-          <!-- Left Presentation Panel -->
-          <div class="left-panel">
-            <div class="left-header">
-              <span class="nodo-tag">ALTA DE CUENTA</span>
-              <span class="version-tag">{{ accountType === 'empresa' ? 'REGISTRO CORPORATIVO' : 'CUENTA PERSONAL' }}</span>
-            </div>
-
-            <div class="left-content">
-              <span class="section-tag">PLATAFORMA INTEGRAL</span>
-              <h1>Empieza a gestionar tu inventario con precisión</h1>
-              <p>
-                {{ accountType === 'empresa' 
-                  ? 'Habilita la sincronización de existencias, control de almacenes y reportes operacionales para tu organización.' 
-                  : 'Administra tus existencias, pedidos personales y catálogo de productos con total facilidad.' }}
-              </p>
-
-              <div class="sync-card">
-                <div class="sync-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  </svg>
-                </div>
-                <div class="sync-details">
-                  <div class="sync-title">
-                    <span>Privacidad y Aislamiento</span>
-                    <strong class="sync-percent">AES-256</strong>
-                  </div>
-                  <span class="sync-sub">Datos seguros e independientes</span>
-                </div>
-              </div>
-
-              <div class="stats-grid">
-                <div class="stat-box">
-                  <span class="stat-label">CONFIGURACIÓN</span>
-                  <div class="stat-value">Rápida</div>
-                  <span class="stat-trend">Sin complicaciones</span>
-                </div>
-                <div class="stat-box">
-                  <span class="stat-label">CONECTIVIDAD</span>
-                  <div class="stat-value-text">Nativa</div>
-                  <span class="stat-subtext">Vía API REST</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="left-footer">
-              Infraestructura lista para operar de inmediato.
-            </div>
-          </div>
-
-          <!-- Right Form Panel -->
-          <div class="right-panel">
-            <div class="right-header">
-              <span class="console-tag">CREACIÓN DE CUENTA</span>
-              <span class="tls-badge">Conexión Segura</span>
-            </div>
-
-            <div class="form-intro">
-              <h2 class="form-title">Crear Cuenta</h2>
-              <p class="form-subtitle">
-                {{ accountType === 'empresa' 
-                  ? 'Completa el formulario para registrar a tu organización.' 
-                  : 'Completa tus datos personales para crear tu cuenta.' }}
-              </p>
-            </div>
-
-            <form (submit)="onRegisterSubmit($event)" class="register-form">
-              <!-- Selector de Tipo de Registro (Empresa o Persona Natural) -->
-              <div class="form-group">
-                <label>Tipo de Registro</label>
-                <div class="input-select-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                  </span>
-                  <select name="accountType" [(ngModel)]="accountType">
-                    <option value="empresa">Empresa</option>
-                    <option value="persona">Persona Natural</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- ================= CAMPOS: PERSONA NATURAL ================= -->
-              <ng-container *ngIf="accountType === 'persona'">
-                <div class="form-row-2">
-                  <div class="form-group">
-                    <label>Nombre</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                          <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                      </span>
-                      <input type="text" name="firstName" [(ngModel)]="firstName" placeholder="Ej. Juan" required />
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Apellido</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                          <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                      </span>
-                      <input type="text" name="lastName" [(ngModel)]="lastName" placeholder="Ej. Pérez" required />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>Correo Electrónico</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                        <polyline points="22,6 12,13 2,6"></polyline>
-                      </svg>
-                    </span>
-                    <input type="email" name="email" [(ngModel)]="email" placeholder="juan.perez@correo.com" required />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>Número de Teléfono</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                      </svg>
-                    </span>
-                    <input type="tel" name="phone" [(ngModel)]="phone" placeholder="Ej. +57 300 123 4567" required />
-                  </div>
-                </div>
-              </ng-container>
-
-              <!-- ================= CAMPOS: EMPRESA ================= -->
-              <ng-container *ngIf="accountType === 'empresa'">
-                <div class="form-row-2">
-                  <div class="form-group">
-                    <label>Organización / Empresa</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                        </svg>
-                      </span>
-                      <input type="text" name="companyName" [(ngModel)]="companyName" placeholder="Ej. Logística Global S.A." required />
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Identificador Fiscal / RFC / NIT</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                      </span>
-                      <input type="text" name="taxId" [(ngModel)]="taxId" placeholder="Ej. LGL240101-XX1" required />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>Nombre Completo del Responsable</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                    </span>
-                    <input type="text" name="name" [(ngModel)]="name" placeholder="Ej. Carlos Mendoza" required />
-                  </div>
-                </div>
-
-                <div class="form-row-2">
-                  <div class="form-group">
-                    <label>Correo Corporativo</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                      </span>
-                      <input type="email" name="email" [(ngModel)]="email" placeholder="carlos@empresa.com" required />
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Teléfono Corporativo</label>
-                    <div class="input-wrapper">
-                      <span class="input-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                      </span>
-                      <input type="tel" name="phone" [(ngModel)]="phone" placeholder="Ej. +57 601 234 5678" />
-                    </div>
-                  </div>
-                </div>
-              </ng-container>
-
-              <!-- ================= CONTRASEÑAS (COMÚN A AMBOS) ================= -->
-              <div class="form-row-2">
-                <div class="form-group">
-                  <label>Contraseña</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </span>
-                    <input type="password" name="password" [(ngModel)]="password" placeholder="Mínimo 6 caracteres" required />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label>Confirmar Contraseña</label>
-                  <div class="input-wrapper">
-                    <span class="input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </span>
-                    <input type="password" name="confirmPassword" [(ngModel)]="confirmPassword" placeholder="Repite tu contraseña" required />
-                  </div>
-                </div>
-              </div>
-
-              <div class="checkbox-group">
-                <input type="checkbox" id="terms" required />
-                <label for="terms">Acepto los <a href="#">Términos del Servicio</a> y las <a href="#">Políticas de Privacidad</a></label>
-              </div>
-
-              <div *ngIf="registerMessage" class="feedback-msg success-box">
-                <strong>Éxito:</strong> {{ registerMessage }}
-              </div>
-
-              <div *ngIf="registerError" class="feedback-msg error-box">
-                <strong>Error:</strong> {{ registerError }}
-              </div>
-
-              <button type="submit" class="btn-submit" [disabled]="isLoading">
-                <span *ngIf="!isLoading">Completar Registro</span>
-                <span *ngIf="isLoading">Creando cuenta...</span>
-              </button>
-
-              <div class="login-link">
-                <span>¿Ya tienes una cuenta?</span>
-                <a href="/login">Iniciar Sesión</a>
-              </div>
-            </form>
-
-            <div class="right-footer">
-              <span>Plataforma Firmeza</span>
-              <span>Protección activa</span>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <footer class="bottom-footer">
-        <div class="footer-left">
-          <span>© 2026 Firmeza Technologies. Todos los derechos reservados.</span>
-        </div>
-        <div class="footer-right">
-          <a href="#">Privacidad</a>
-          <a href="#">Términos</a>
-          <a href="#">Soporte</a>
-        </div>
-      </footer>
-    </div>
-  `,
+  templateUrl: './Register.Component.html',
   styles: [`
     :host { 
       display: block; 
@@ -800,16 +492,24 @@ export class RegisterComponent implements OnInit {
   password = '';
   confirmPassword = '';
 
-  isLoading = false;
+  loading = false;
+  get isLoading(): boolean {
+    return this.loading;
+  }
+  set isLoading(value: boolean) {
+    this.loading = value;
+  }
+
   registerMessage: string | null = null;
   registerError: string | null = null;
 
-  private readonly apiService = inject(ApiService);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   ngOnInit(): void {}
 
-  onRegisterSubmit(event: Event): void {
-    event.preventDefault();
+  onSubmit(event?: Event): void {
+    event?.preventDefault();
     this.registerError = null;
     this.registerMessage = null;
 
@@ -818,14 +518,15 @@ export class RegisterComponent implements OnInit {
       return;
     }
 
-    this.isLoading = true;
+    this.loading = true;
 
-    const userData = this.accountType === 'persona'
+    const payload = this.accountType === 'persona'
       ? {
           accountType: 'persona',
           firstName: this.firstName,
           lastName: this.lastName,
           name: `${this.firstName} ${this.lastName}`.trim(),
+          fullName: `${this.firstName} ${this.lastName}`.trim(),
           email: this.email,
           phone: this.phone,
           password: this.password
@@ -835,22 +536,32 @@ export class RegisterComponent implements OnInit {
           companyName: this.companyName,
           taxId: this.taxId,
           name: this.name,
+          fullName: this.name,
           email: this.email,
           phone: this.phone,
           password: this.password
         };
 
-    this.apiService.register(userData).subscribe({
+    this.authService.register(payload).subscribe({
       next: (response: any) => {
-        this.isLoading = false;
+        this.loading = false;
         this.registerMessage = typeof response === 'string'
           ? response
           : (response?.message || 'Registro exitoso');
+        if (response?.token) {
+          this.router.navigate(['/app/dashboard']);
+        } else {
+          setTimeout(() => this.router.navigate(['/login']), 1200);
+        }
       },
       error: (err: any) => {
-        this.isLoading = false;
+        this.loading = false;
         this.registerError = err?.error?.message || err?.error || err?.message || 'Error al registrar';
       }
     });
+  }
+
+  onRegisterSubmit(event?: Event): void {
+    this.onSubmit(event);
   }
 }

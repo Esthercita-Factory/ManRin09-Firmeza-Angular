@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/Firmeza.Infrastructure.props" />
-</Project>

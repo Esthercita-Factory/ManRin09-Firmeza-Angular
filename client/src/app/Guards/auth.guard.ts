@@ -1,26 +1,23 @@
-import { Injectable, inject } from '@angular/core';
-import { CanActivate, Router, UrlTree, ActivatedRouteSnapshot, RouterStateSnapshot, CanActivateFn } from '@angular/router';
+import { inject } from '@angular/core';
+import { CanActivateFn, Router, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { AuthService } from '../Services/auth.service';
 
-@Injectable({
-  providedIn: 'root'
-})
-export class AuthGuard implements CanActivate {
-  private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
+export const authGuard: CanActivateFn = (
+  route?: ActivatedRouteSnapshot,
+  state?: RouterStateSnapshot
+): boolean | UrlTree => {
+  const router = inject(Router);
+  const authService = inject(AuthService);
+  const token = authService.getToken() || localStorage.getItem('firmeza_token') || localStorage.getItem('token');
 
-  canActivate(
-    route?: ActivatedRouteSnapshot,
-    state?: RouterStateSnapshot
-  ): boolean | UrlTree {
-    if (this.authService.isAuthenticated()) {
-      return true;
-    }
-
-    return this.router.createUrlTree(['/login']);
+  if (token) {
+    return true;
   }
-}
 
-export const authGuard: CanActivateFn = (route, state) => {
-  return inject(AuthGuard).canActivate(route, state);
+  return router.createUrlTree(['/login']);
 };
+
+// Clase exportada para compatibilidad
+export class AuthGuard {
+  canActivate = authGuard;
+}

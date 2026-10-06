@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/Firmeza.Domain.props" />
-</Project>

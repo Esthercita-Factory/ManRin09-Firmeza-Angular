@@ -41,15 +41,15 @@ export class AuthService {
     }
   }
 
-  register(userData: any): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/register`, userData).pipe(
+  register(data: any): Observable<any> {
+    return this.http.post<any>('http://localhost:5235/api/auth/register', data).pipe(
       tap((response: any) => {
         if (response && response.token) {
           this.saveToken(response.token);
           const user: UserSession = {
             email: response.email,
             role: response.role,
-            fullName: userData.companyName || userData.name || `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim()
+            fullName: data.companyName || data.name || `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim()
           };
           this.saveUser(user);
         }
@@ -57,14 +57,17 @@ export class AuthService {
     );
   }
 
-  login(credentials: any): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
-      tap((response: AuthResponse) => {
-        if (response && response.token) {
-          this.saveToken(response.token);
+  login(credentials: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/login`, credentials).pipe(
+      tap((response: any) => {
+        const token = response?.token || response?.Token || response?.accessToken || response?.jwt;
+        if (token) {
+          this.saveToken(token);
           const user: UserSession = {
-            email: response.email,
-            role: response.role
+            id: response?.userId || response?.UserId,
+            email: response?.email || response?.Email || credentials?.email,
+            role: response?.role || response?.Role || 'User',
+            fullName: response?.fullName || response?.FullName
           };
           this.saveUser(user);
         }
@@ -74,10 +77,11 @@ export class AuthService {
 
   saveToken(token: string): void {
     localStorage.setItem(this.tokenKey, token);
+    localStorage.setItem('token', token);
   }
 
   getToken(): string | null {
-    return localStorage.getItem(this.tokenKey);
+    return localStorage.getItem(this.tokenKey) || localStorage.getItem('token');
   }
 
   saveUser(user: UserSession): void {

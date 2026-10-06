@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../Services/Api.Service';
 
 @Component({
@@ -89,7 +90,7 @@ import { ApiService } from '../../Services/Api.Service';
               <p class="form-subtitle">Ingresa tus credenciales autorizadas para acceder a la plataforma.</p>
             </div>
 
-            <form (submit)="onLoginSubmit($event)" class="login-form">
+            <form (ngSubmit)="onLoginSubmit($event)" class="login-form">
               <div class="form-group">
                 <label>Correo Electrónico</label>
                 <div class="input-wrapper">
@@ -655,11 +656,12 @@ export class LoginComponent implements OnInit {
   loginError: string | null = null;
 
   private readonly apiService = inject(ApiService);
+  private readonly router = inject(Router);
 
   ngOnInit(): void {}
 
-  onLoginSubmit(event: Event): void {
-    event.preventDefault();
+  onLoginSubmit(event?: Event): void {
+    event?.preventDefault();
     this.loginError = null;
     this.loginMessage = null;
     this.isLoading = true;
@@ -675,11 +677,27 @@ export class LoginComponent implements OnInit {
         this.loginMessage = typeof response === 'string'
           ? response
           : (response?.message || 'Inicio de sesión exitoso');
+
+        const token = response?.token || response?.Token || response?.accessToken;
+        if (token) {
+          localStorage.setItem('firmeza_token', token);
+          localStorage.setItem('token', token);
+        }
+
+        this.router.navigate(['/app/dashboard']).then(success => {
+          if (!success) {
+            this.router.navigate(['/dashboard']);
+          }
+        });
       },
       error: (err: any) => {
         this.isLoading = false;
         this.loginError = err?.error?.message || err?.error || err?.message || 'Error al iniciar sesión';
       }
     });
+  }
+
+  onSubmit(event?: Event): void {
+    this.onLoginSubmit(event);
   }
 }
