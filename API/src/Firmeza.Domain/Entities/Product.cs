@@ -1,4 +1,4 @@
-﻿namespace Firmeza.Domain.Entities;
+namespace Firmeza.Domain.Entities;
 
 public class Product
 {

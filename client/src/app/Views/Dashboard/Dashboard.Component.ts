@@ -1,334 +1,554 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../Services/dashboard.service';
 import { AuthService } from '../../Services/auth.service';
 
-interface MetricItem {
-  title: string;
-  value: string;
-  change: string;
-  isPositive: boolean;
-  caption: string;
-  badge: string;
-  sparkline: number[];
-}
-
-interface ActivityItem {
-  id: string;
+interface Transaction {
   sku: string;
   product: string;
-  warehouse: string;
-  type: 'Entrada' | 'Despacho' | 'Ajuste';
+  detail: string;
+  type: 'ENTRADA' | 'SALIDA' | 'TRASPASO';
   quantity: string;
-  value: string;
+  isPositive: boolean;
+  isNeutral?: boolean;
+  location: string;
+  toLocation?: string;
+  locationHighlight?: boolean;
+  operator: string;
+  operatorInitials: string;
+  operatorBg: string;
+  operatorColor: string;
+  dateTime: string;
   status: 'Completado' | 'En Tránsito' | 'En Verificación';
-  time: string;
 }
 
-interface WarehouseCapacity {
+interface RestockItem {
   name: string;
-  location: string;
-  percentage: number;
-  skus: number;
-  status: 'Normal' | 'Alto' | 'Óptimo';
+  badge: 'CRÍTICO' | 'BAJO';
+  badgeType: 'critical' | 'low';
+  sku: string;
+  stockActual: string;
+  stockMin: number;
+  aisle: string;
 }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="enterprise-dashboard">
-      <!-- Encabezado Operativo Minimalista -->
-      <header class="dashboard-header">
-        <div class="header-titles">
-          <div class="tag-row">
-            <span class="telemetry-badge">
-              <span class="ping-dot"></span>
-              TELEMETRÍA EN TIEMPO REAL
-            </span>
-            <span class="env-pill">PRODUCCIÓN // NODO CENTRAL</span>
+    <div class="fz-viewport">
+      <!-- 1. Encabezado de Control Operativo -->
+      <header class="header-banner">
+        <div class="header-left">
+          <div class="header-icon-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
           </div>
-          <h1 class="main-title">Consola de Control de Inventario</h1>
-          <p class="subtitle">Monitoreo continuo de almacenes, trazabilidad de stock y conciliación operativa.</p>
+          <div class="header-titles">
+            <div class="title-with-pill">
+              <h1 class="page-title">Panel General de Inventario</h1>
+              <span class="live-status-pill">
+                <span class="pulse-dot"></span>
+                SINCRONIZADO EN TIEMPO REAL
+              </span>
+            </div>
+            <div class="status-subtitle">
+              <span>Actualizado hace 2 minutos</span>
+              <span class="sep-dot">•</span>
+              <span>Viernes, 25 de septiembre de 2026</span>
+            </div>
+          </div>
         </div>
 
-        <div class="header-controls">
-          <!-- Filtro de Temporalidad Minimalista -->
-          <div class="range-selector">
-            <button 
-              *ngFor="let range of ['7D', '30D', '3M', '1A']" 
-              (click)="selectedRange = range"
-              [class.active]="selectedRange === range"
-              class="range-btn">
-              {{ range }}
-            </button>
+        <div class="header-actions">
+          <!-- Dropdown Selección de Almacén -->
+          <div class="select-container">
+            <svg class="pin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <select [(ngModel)]="selectedWarehouse" class="warehouse-dropdown">
+              <option value="central-a">Almacén Central - Nave A</option>
+              <option value="norte-b">Bodega Norte - Nave B</option>
+              <option value="occidente-c">Centro Occidente - Nave C</option>
+            </select>
+            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
           </div>
 
-          <button (click)="refreshData()" class="btn-action btn-secondary" title="Recargar métricas">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          <!-- Botón Exportar Balance -->
+          <button class="btn-action-outline" (click)="onExportBalance()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span>Sincronizar</span>
+            <span>Exportar Balance</span>
           </button>
 
-          <a routerLink="/plans" class="btn-action btn-primary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          <!-- Acceso directo a Movimientos y Pedidos -->
+          <a routerLink="/app/enterprises" class="btn-action-blue" style="text-decoration: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m7 16-4-4 4-4"></path>
+              <path d="M3 12h18"></path>
+              <path d="m17 8 4 4-4 4"></path>
             </svg>
-            <span>Mejorar Plan</span>
+            <span>Ver Movimientos</span>
           </a>
         </div>
       </header>
 
-      <!-- Cuadrícula de Métricas Clave (KPIs) -->
-      <section class="kpi-grid">
-        <div *ngFor="let kpi of kpiMetrics" class="kpi-card">
-          <div class="kpi-top">
-            <span class="kpi-label">{{ kpi.title }}</span>
-            <span class="kpi-tag" [class.trend-up]="kpi.isPositive" [class.trend-neutral]="!kpi.isPositive">
-              {{ kpi.badge }}
-            </span>
+      <!-- 2. Tarjetas de Métricas Clave (KPIs) -->
+      <section class="kpis-grid">
+        <!-- KPI 1: Valor Total Inventario -->
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <span class="kpi-title">Valor Total Inventario</span>
+            <div class="kpi-icon-container blue-tint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+            </div>
           </div>
-
-          <div class="kpi-main">
-            <div class="kpi-value">{{ kpi.value }}</div>
-            <div class="kpi-trend" [class.positive]="kpi.isPositive" [class.negative]="!kpi.isPositive">
-              <svg *ngIf="kpi.isPositive" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <div class="kpi-big-value">$1,482,930</div>
+          <div class="kpi-bottom-row">
+            <span class="kpi-pill green-pill">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                 <polyline points="18 15 12 9 6 15"></polyline>
               </svg>
-              <svg *ngIf="!kpi.isPositive" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
+              +3.4%
+            </span>
+            <span class="kpi-caption">vs. mes anterior</span>
+          </div>
+        </div>
+
+        <!-- KPI 2: SKUs Activos en Almacén -->
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <span class="kpi-title">SKUs Activos en Almacén</span>
+            <div class="kpi-icon-container teal-tint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="8.5" y="14" width="7" height="7"></rect>
+                <line x1="6.5" y1="10" x2="12" y2="14"></line>
+                <line x1="17.5" y1="10" x2="12" y2="14"></line>
               </svg>
-              <span>{{ kpi.change }}</span>
             </div>
           </div>
+          <div class="kpi-big-value">8,420</div>
+          <div class="kpi-progress-row">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" style="width: 94%;"></div>
+            </div>
+            <span class="progress-label">94% Disponibles</span>
+          </div>
+        </div>
 
-          <div class="kpi-footer">
-            <span class="kpi-caption">{{ kpi.caption }}</span>
-            <!-- Mini Sparkline SVG -->
-            <div class="sparkline-wrapper">
-              <svg width="68" height="22" viewBox="0 0 68 22" fill="none">
-                <path [attr.d]="getSparklinePath(kpi.sparkline)" 
-                      [attr.stroke]="kpi.isPositive ? '#10b981' : '#6366f1'" 
-                      stroke-width="2" 
-                      stroke-linecap="round" 
-                      stroke-linejoin="round" />
+        <!-- KPI 3: Alertas de Stock Crítico -->
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <span class="kpi-title">Alertas de Stock Crítico</span>
+            <div class="kpi-icon-container red-tint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
               </svg>
             </div>
+          </div>
+          <div class="kpi-big-value">
+            <span class="alert-red-number">14</span>
+            <span class="alert-suffix">items</span>
+          </div>
+          <div class="kpi-bottom-row">
+            <span class="kpi-pill red-pill">ACCIÓN PRIORITARIA</span>
+            <span class="kpi-caption">6 quiebres inminentes</span>
+          </div>
+        </div>
+
+        <!-- KPI 4: Movimientos del Día -->
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <span class="kpi-title">Movimientos del Día</span>
+            <div class="kpi-icon-container blue-tint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="3" width="15" height="13"></rect>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-big-value">
+            <span>158</span>
+            <span class="order-suffix">órdenes</span>
+          </div>
+          <div class="kpi-bottom-row space-between">
+            <span class="delivery-rate">92% de cumplimiento diario</span>
+            <span class="kpi-pill green-pill">A TIEMPO</span>
           </div>
         </div>
       </section>
 
-      <!-- Sección Principal de Gráficas Empresariales -->
-      <section class="charts-row">
-        <!-- Gráfica 1: Área y Flujo de Inventario (Curva SVG Interactiva) -->
-        <div class="chart-card primary-chart">
-          <div class="card-header">
+      <!-- 3. Accesos Rápidos / Acciones de Operación -->
+      <section class="shortcuts-grid">
+        <div class="shortcut-card" (click)="onShortcutClick('scanner')">
+          <div class="shortcut-icon blue-tint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+              <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+              <line x1="7" y1="12" x2="17" y2="12"></line>
+            </svg>
+          </div>
+          <div class="shortcut-info">
+            <h2 class="shortcut-title">Escáner Móvil / Terminal</h2>
+            <p class="shortcut-desc">Verificación rápida de bultos y palets</p>
+          </div>
+          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+
+        <div class="shortcut-card" (click)="onShortcutClick('audit')">
+          <div class="shortcut-icon blue-tint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+          </div>
+          <div class="shortcut-info">
+            <h2 class="shortcut-title">Auditoría Cíclica de Pasillo</h2>
+            <p class="shortcut-desc">Conteo aleatorio programado (Pasillos A01-A08)</p>
+          </div>
+          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+
+        <div class="shortcut-card" (click)="onShortcutClick('losses')">
+          <div class="shortcut-icon orange-tint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div class="shortcut-info">
+            <h2 class="shortcut-title">Registro de Mermas / Daños</h2>
+            <p class="shortcut-desc">Ajuste inmediato por rotura o vencimiento</p>
+          </div>
+          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </section>
+
+      <!-- 4. Sección Media: Gráfica Semanal y Reabastecimiento -->
+      <section class="mid-section-grid">
+        <!-- Gráfica de Movimientos Semanales -->
+        <div class="weekly-chart-card">
+          <div class="chart-header">
             <div>
-              <div class="card-pretitle">DINÁMICA LOGÍSTICA</div>
-              <h2 class="card-title">Flujo de Stock y Rotación Mensual</h2>
+              <h2 class="chart-title">Flujo de Movimientos Semanales</h2>
+              <p class="chart-subtitle">Balance dinámico de entradas vs. despachos en Almacén Central</p>
             </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot in"></span>Entradas de Stock</span>
-              <span class="legend-item"><span class="legend-dot out"></span>Despachos a Clientes</span>
+            <div class="chart-legend-group">
+              <div class="legend-item">
+                <span class="legend-box blue-box"></span>
+                <span>Entradas</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-box dark-navy-box"></span>
+                <span>Salidas / Envíos</span>
+              </div>
+              <span class="sem-tag">SEM 43</span>
             </div>
           </div>
 
-          <!-- Lienzo Gráfico SVG Responsive -->
-          <div class="chart-svg-container">
-            <svg viewBox="0 0 740 240" class="responsive-svg" preserveAspectRatio="none">
+          <!-- Gráfico SVG con barras duales y curva suavizada -->
+          <div class="chart-canvas-container">
+            <svg viewBox="0 0 650 200" preserveAspectRatio="none" class="chart-svg">
               <defs>
-                <linearGradient id="areaGradientIn" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#2563eb" stop-opacity="0.28" />
-                  <stop offset="100%" stop-color="#2563eb" stop-opacity="0.00" />
-                </linearGradient>
-                <linearGradient id="areaGradientOut" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#6366f1" stop-opacity="0.20" />
-                  <stop offset="100%" stop-color="#6366f1" stop-opacity="0.00" />
+                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>
+                  <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>
                 </linearGradient>
               </defs>
 
-              <!-- Líneas Guía Horizontales -->
-              <line x1="30" y1="40" x2="720" y2="40" stroke="#f1f5f9" stroke-dasharray="4 4" stroke-width="1"/>
-              <line x1="30" y1="95" x2="720" y2="95" stroke="#f1f5f9" stroke-dasharray="4 4" stroke-width="1"/>
-              <line x1="30" y1="150" x2="720" y2="150" stroke="#f1f5f9" stroke-dasharray="4 4" stroke-width="1"/>
-              <line x1="30" y1="205" x2="720" y2="205" stroke="#e2e8f0" stroke-width="1"/>
+              <!-- Líneas guía punteadas horizontales -->
+              <line x1="20" y1="35" x2="630" y2="35" stroke="#e2e8f0" stroke-dasharray="3,3" stroke-width="1"></line>
+              <line x1="20" y1="80" x2="630" y2="80" stroke="#e2e8f0" stroke-dasharray="3,3" stroke-width="1"></line>
+              <line x1="20" y1="125" x2="630" y2="125" stroke="#e2e8f0" stroke-dasharray="3,3" stroke-width="1"></line>
+              <line x1="20" y1="170" x2="630" y2="170" stroke="#f1f5f9" stroke-width="1"></line>
 
-              <!-- Etiquetas Eje Y -->
-              <text x="20" y="44" fill="#94a3b8" font-size="11" text-anchor="end">100k</text>
-              <text x="20" y="99" fill="#94a3b8" font-size="11" text-anchor="end">75k</text>
-              <text x="20" y="154" fill="#94a3b8" font-size="11" text-anchor="end">50k</text>
-              <text x="20" y="209" fill="#94a3b8" font-size="11" text-anchor="end">0</text>
+              <!-- Barras duales: Blue (#3b82f6) & Dark Navy (#1e293b) -->
+              <!-- LUN (x=50) -->
+              <rect x="42" y="75" width="13" height="95" rx="2" fill="#3b82f6"></rect>
+              <rect x="58" y="85" width="13" height="85" rx="2" fill="#1e293b"></rect>
 
-              <!-- Áreas de Degradado -->
-              <polygon points="50,175 160,135 270,110 380,140 490,80 600,65 710,48 710,205 50,205" fill="url(#areaGradientIn)" />
-              <polygon points="50,190 160,165 270,145 380,160 490,120 600,105 710,90 710,205 50,205" fill="url(#areaGradientOut)" />
+              <!-- MAR (x=135) -->
+              <rect x="127" y="62" width="13" height="108" rx="2" fill="#3b82f6"></rect>
+              <rect x="143" y="65" width="13" height="105" rx="2" fill="#1e293b"></rect>
 
-              <!-- Línea Despachos (Índigo) -->
-              <polyline points="50,190 160,165 270,145 380,160 490,120 600,105 710,90" 
-                        fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+              <!-- MIÉ (x=220) -->
+              <rect x="212" y="45" width="13" height="125" rx="2" fill="#3b82f6"></rect>
+              <rect x="228" y="55" width="13" height="115" rx="2" fill="#1e293b"></rect>
 
-              <!-- Línea Entradas (Azul Principal) -->
-              <polyline points="50,175 160,135 270,110 380,140 490,80 600,65 710,48" 
-                        fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              <!-- JUE (x=305) -->
+              <rect x="297" y="58" width="13" height="112" rx="2" fill="#3b82f6"></rect>
+              <rect x="313" y="62" width="13" height="108" rx="2" fill="#1e293b"></rect>
 
-              <!-- Puntos Interactivos con Hover -->
-              <g *ngFor="let pt of chartPoints">
-                <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="4.5" fill="#ffffff" stroke="#2563eb" stroke-width="2.5" class="chart-point" />
-                <text [attr.x]="pt.x" y="225" fill="#64748b" font-size="11" font-weight="600" text-anchor="middle">{{ pt.month }}</text>
-              </g>
+              <!-- VIE (x=390) -->
+              <rect x="382" y="40" width="13" height="130" rx="2" fill="#3b82f6"></rect>
+              <rect x="398" y="37" width="13" height="133" rx="2" fill="#1e293b"></rect>
+
+              <!-- SÁB (x=475) -->
+              <rect x="467" y="98" width="13" height="72" rx="2" fill="#3b82f6"></rect>
+              <rect x="483" y="105" width="13" height="65" rx="2" fill="#1e293b"></rect>
+
+              <!-- DOM (x=560) -->
+              <rect x="552" y="125" width="13" height="45" rx="2" fill="#3b82f6"></rect>
+              <rect x="568" y="128" width="13" height="42" rx="2" fill="#1e293b"></rect>
+
+              <!-- Área bajo la curva de tendencia suave -->
+              <path d="M 50 80 C 100 68, 170 50, 220 50 C 265 50, 345 52, 390 40 C 435 28, 450 85, 480 102 C 520 120, 540 126, 565 127 L 565 170 L 50 170 Z" fill="url(#areaGradient)"></path>
+
+              <!-- Curva de tendencia suavizada celeste/azul brillante -->
+              <path d="M 50 80 C 100 68, 170 50, 220 50 C 265 50, 345 52, 390 40 C 435 28, 450 85, 480 102 C 520 120, 540 126, 565 127" fill="none" stroke="#0284c7" stroke-width="2.6" stroke-linecap="round"></path>
             </svg>
+
+            <!-- Etiquetas de los días -->
+            <div class="days-row">
+              <span class="day-label">LUN</span>
+              <span class="day-label">MAR</span>
+              <span class="day-label">MIÉ</span>
+              <span class="day-label">JUE</span>
+              <span class="day-label">VIE</span>
+              <span class="day-label">SÁB</span>
+              <span class="day-label">DOM</span>
+            </div>
+          </div>
+
+          <!-- Métricas de pie de la gráfica -->
+          <div class="chart-summary-bar">
+            <div class="summary-col">
+              <span class="summary-label">TOTAL INGRESOS</span>
+              <span class="summary-val text-blue">1,248 uds</span>
+            </div>
+            <div class="summary-col">
+              <span class="summary-label">TOTAL DESPACHOS</span>
+              <span class="summary-val text-navy">1,312 uds</span>
+            </div>
+            <div class="summary-col">
+              <span class="summary-label">ROTACIÓN PROMEDIO</span>
+              <span class="summary-val text-green">4.8 días</span>
+            </div>
           </div>
         </div>
 
-        <!-- Gráfica 2: Distribución por Categorías (Donut SVG Minimalista) -->
-        <div class="chart-card secondary-chart">
-          <div class="card-header">
-            <div>
-              <div class="card-pretitle">CATEGORIZACIÓN</div>
-              <h2 class="card-title">Composición de Stock</h2>
+        <!-- Columna de Reabastecimiento -->
+        <div class="restock-card">
+          <div class="restock-header">
+            <div class="restock-title-row">
+              <div class="restock-title-group">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <h2 class="restock-title">Reabastecimiento</h2>
+              </div>
+              <span class="critical-count-pill">3 CRÍTICOS</span>
+            </div>
+            <p class="restock-subtitle">Artículos que han sobrepasado su punto mínimo de reorden calculado por volumen.</p>
+          </div>
+
+          <!-- Lista de 3 Artículos Críticos -->
+          <div class="restock-items-list">
+            <div *ngFor="let item of restockItems" class="restock-item">
+              <div class="item-title-row">
+                <span class="item-name">{{ item.name }}</span>
+                <span [class]="'badge-' + item.badgeType">{{ item.badge }}</span>
+              </div>
+              <div class="item-sku">SKU: {{ item.sku }}</div>
+              <div class="item-stats-row">
+                <span class="stock-info">
+                  Stock actual: <strong [class]="item.badgeType === 'critical' ? 'text-red' : 'text-amber'">{{ item.stockActual }}</strong> / Mín: {{ item.stockMin }}
+                </span>
+                <span class="aisle-info">{{ item.aisle }}</span>
+              </div>
+              <button class="btn-solicitar" (click)="onRequestRestock(item)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="9" cy="21" r="1"></circle>
+                  <circle cx="20" cy="21" r="1"></circle>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span>Solicitar Pedido</span>
+              </button>
             </div>
           </div>
 
-          <div class="donut-wrapper">
-            <div class="donut-svg-box">
-              <svg viewBox="0 0 160 160" width="150" height="150">
-                <!-- Círculo Base Fondo -->
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#f1f5f9" stroke-width="18" />
-
-                <!-- Segmentos Donut SVG con dasharray -->
-                <!-- Segmento 1: Materia Prima (42%) -->
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#2563eb" stroke-width="18"
-                        stroke-dasharray="153 364" stroke-dashoffset="0" stroke-linecap="round" />
-                
-                <!-- Segmento 2: Terminado (32%) -->
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#6366f1" stroke-width="18"
-                        stroke-dasharray="116 364" stroke-dashoffset="-158" stroke-linecap="round" />
-
-                <!-- Segmento 3: Empaques (16%) -->
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#10b981" stroke-width="18"
-                        stroke-dasharray="58 364" stroke-dashoffset="-278" stroke-linecap="round" />
-
-                <!-- Segmento 4: Tránsito (10%) -->
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#f59e0b" stroke-width="18"
-                        stroke-dasharray="36 364" stroke-dashoffset="-340" stroke-linecap="round" />
-              </svg>
-              <div class="donut-center-info">
-                <span class="donut-num">34.8k</span>
-                <span class="donut-sub">SKUs Totales</span>
-              </div>
-            </div>
-
-            <div class="donut-breakdown">
-              <div class="breakdown-item">
-                <span class="color-pip pip-blue"></span>
-                <span class="breakdown-name">Materia Prima</span>
-                <span class="breakdown-val">42%</span>
-              </div>
-              <div class="breakdown-item">
-                <span class="color-pip pip-indigo"></span>
-                <span class="breakdown-name">Prod. Terminado</span>
-                <span class="breakdown-val">32%</span>
-              </div>
-              <div class="breakdown-item">
-                <span class="color-pip pip-green"></span>
-                <span class="breakdown-name">Suministros</span>
-                <span class="breakdown-val">16%</span>
-              </div>
-              <div class="breakdown-item">
-                <span class="color-pip pip-amber"></span>
-                <span class="breakdown-name">En Tránsito</span>
-                <span class="breakdown-val">10%</span>
-              </div>
-            </div>
+          <div class="restock-footer">
+            <a routerLink="/app/dashboard" class="catalog-link">Ver catálogo completo de reorden →</a>
           </div>
         </div>
       </section>
 
-      <!-- Fila Inferior: Capacidad por Almacén y Movimientos Recientes -->
-      <section class="bottom-split-row">
-        <!-- Tarjeta: Capacidad y Ocupación por Bodega -->
-        <div class="split-card warehouse-card">
-          <div class="card-header">
-            <div>
-              <div class="card-pretitle">INFRAESTRUCTURA</div>
-              <h2 class="card-title">Ocupación por Centro Logístico</h2>
-            </div>
-            <span class="live-status">4 Bodegas Sincronizadas</span>
+      <!-- 5. Tabla de Movimientos y Transacciones Recientes -->
+      <section class="transactions-card">
+        <div class="table-top-bar">
+          <div>
+            <h2 class="table-card-title">Movimientos y Transacciones Recientes</h2>
+            <p class="table-card-subtitle">Registro cronológico de ingresos, despachos y transferencias entre ubicaciones</p>
           </div>
 
-          <div class="warehouses-list">
-            <div *ngFor="let wh of warehouses" class="warehouse-row">
-              <div class="wh-meta">
-                <div class="wh-name-box">
-                  <span class="wh-name">{{ wh.name }}</span>
-                  <span class="wh-loc">{{ wh.location }}</span>
-                </div>
-                <div class="wh-stat">
-                  <span class="wh-percent">{{ wh.percentage }}%</span>
-                  <span class="wh-skus">{{ wh.skus | number }} artículos</span>
-                </div>
-              </div>
-
-              <div class="progress-track">
-                <div class="progress-bar" 
-                     [style.width.%]="wh.percentage"
-                     [class.bar-high]="wh.percentage > 85"
-                     [class.bar-optimal]="wh.percentage <= 85">
-                </div>
-              </div>
+          <div class="table-controls">
+            <!-- Buscador interno -->
+            <div class="table-search-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input 
+                type="text" 
+                [(ngModel)]="searchFilter" 
+                placeholder="Filtrar por SKU o lote..." 
+                class="table-search-input"
+              />
             </div>
+
+            <!-- Tabs de Filtro de Tipo -->
+            <div class="filter-tabs">
+              <button 
+                *ngFor="let tab of ['Todos', 'Entradas', 'Salidas', 'Traspasos']"
+                (click)="activeTab = tab"
+                [class.active]="activeTab === tab"
+                class="filter-tab-btn">
+                {{ tab }}
+              </button>
+            </div>
+
+            <!-- Botón Refrescar -->
+            <button class="btn-table-refresh" (click)="refreshTransactions()" title="Recargar transacciones">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
           </div>
         </div>
 
-        <!-- Tarjeta: Registro de Transacciones Recientes -->
-        <div class="split-card transactions-card">
-          <div class="card-header">
-            <div>
-              <div class="card-pretitle">ACTIVIDAD RECIENTE</div>
-              <h2 class="card-title">Últimos Movimientos de Stock</h2>
-            </div>
-            <span class="count-badge">5 eventos</span>
-          </div>
+        <!-- Tabla de Datos -->
+        <div class="table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>SKU / PRODUCTO</th>
+                <th>TIPO MOVIMIENTO</th>
+                <th>CANTIDAD</th>
+                <th>UBICACIÓN / BAHÍA</th>
+                <th>OPERADOR / RESP.</th>
+                <th>FECHA Y HORA</th>
+                <th>ESTADO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of filteredTransactions">
+                <!-- Columna Producto y SKU -->
+                <td>
+                  <div class="product-cell">
+                    <span class="product-title">{{ row.product }}</span>
+                    <span class="product-sku-detail">{{ row.detail }}</span>
+                  </div>
+                </td>
 
-          <div class="table-responsive">
-            <table class="minimal-table">
-              <thead>
-                <tr>
-                  <th>SKU / Producto</th>
-                  <th>Almacén</th>
-                  <th>Operación</th>
-                  <th>Valor</th>
-                  <th>Estado</th>
-                  <th>Tiempo</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let act of recentActivity">
-                  <td class="cell-product">
-                    <span class="product-sku">{{ act.sku }}</span>
-                    <span class="product-title">{{ act.product }}</span>
-                  </td>
-                  <td class="cell-wh">{{ act.warehouse }}</td>
-                  <td>
-                    <span class="op-tag" [class.in]="act.type === 'Entrada'" [class.out]="act.type === 'Despacho'">
-                      {{ act.quantity }}
+                <!-- Columna Tipo Movimiento -->
+                <td>
+                  <span [class]="'pill-type ' + row.type.toLowerCase()">
+                    <span class="type-dot"></span>
+                    {{ row.type }}
+                  </span>
+                </td>
+
+                <!-- Columna Cantidad -->
+                <td>
+                  <span [class]="row.isPositive ? 'qty-positive' : (row.isNeutral ? 'qty-neutral' : 'qty-negative')">
+                    {{ row.quantity }}
+                  </span>
+                </td>
+
+                <!-- Columna Ubicación -->
+                <td>
+                  <div class="location-cell">
+                    <span [class]="'location-badge ' + (row.locationHighlight ? 'location-highlight' : '')">
+                      {{ row.location }}
                     </span>
-                  </td>
-                  <td class="cell-val">{{ act.value }}</td>
-                  <td>
-                    <span class="status-pill" [class.success]="act.status === 'Completado'" [class.pending]="act.status === 'En Tránsito'" [class.review]="act.status === 'En Verificación'">
-                      {{ act.status }}
-                    </span>
-                  </td>
-                  <td class="cell-time">{{ act.time }}</td>
-                </tr>
-              </tbody>
-            </table>
+                    <ng-container *ngIf="row.toLocation">
+                      <span class="arrow-sep">→</span>
+                      <span class="location-badge">{{ row.toLocation }}</span>
+                    </ng-container>
+                  </div>
+                </td>
+
+                <!-- Columna Operador -->
+                <td>
+                  <div class="operator-cell">
+                    <div class="operator-avatar" [style.backgroundColor]="row.operatorBg" [style.color]="row.operatorColor">
+                      {{ row.operatorInitials }}
+                    </div>
+                    <span class="operator-name">{{ row.operator }}</span>
+                  </div>
+                </td>
+
+                <!-- Columna Fecha y Hora -->
+                <td>
+                  <span class="datetime-cell">{{ row.dateTime }}</span>
+                </td>
+
+                <!-- Columna Estado -->
+                <td>
+                  <span [class]="'status-pill ' + getStatusClass(row.status)">
+                    <svg *ngIf="row.status === 'Completado'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <svg *ngIf="row.status === 'En Tránsito'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 22h14"></path>
+                      <path d="M5 2h14"></path>
+                      <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path>
+                      <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path>
+                    </svg>
+                    <svg *ngIf="row.status === 'En Verificación'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    {{ row.status }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Paginación y Contador de Registros -->
+        <div class="table-pagination-footer">
+          <span class="pagination-count">Mostrando 1 - 5 de 158 transacciones hoy</span>
+          <div class="pagination-controls">
+            <button class="btn-pag-nav" disabled>&lt; Anterior</button>
+            <button class="btn-pag-num active">1</button>
+            <button class="btn-pag-num">2</button>
+            <button class="btn-pag-num">3</button>
+            <button class="btn-pag-nav">Siguiente &gt;</button>
           </div>
         </div>
       </section>
@@ -337,645 +557,1157 @@ interface WarehouseCapacity {
   styles: [`
     :host {
       display: block;
-      width: 100%;
-      color: #0f172a;
       background-color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
-    .enterprise-dashboard {
-      padding: 2.25rem 2.5rem;
-      max-width: 1440px;
-      margin: 0 auto;
-      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    /* Header */
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      margin-bottom: 2rem;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .tag-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .telemetry-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #0284c7;
-      background: #f0f9ff;
-      border: 1px solid #e0f2fe;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-    }
-
-    .ping-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: #0284c7;
-      animation: pulsePing 1.8s infinite;
-    }
-
-    @keyframes pulsePing {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    .env-pill {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #64748b;
-      background: #f1f5f9;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-    }
-
-    .main-title {
-      font-size: 1.85rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
+      min-height: 100%;
       color: #0f172a;
-      margin: 0 0 0.35rem 0;
-      line-height: 1.15;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.012em;
     }
 
-    .subtitle {
-      font-size: 0.92rem;
-      color: #64748b;
-      margin: 0;
+    /* El contenedor de la vista usa .fz-viewport (styles.css) */
+
+    /* 1. Header */
+    .header-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      padding-bottom: 0.25rem;
     }
 
-    .header-controls {
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-icon-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+    }
+
+    .header-titles {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .title-with-pill {
       display: flex;
       align-items: center;
       gap: 0.85rem;
+      flex-wrap: wrap;
     }
 
-    .range-selector {
-      display: flex;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      padding: 0.25rem;
-      border-radius: 8px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    .page-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.03em;
+      margin: 0;
+      line-height: 1.2;
     }
 
-    .range-btn {
-      background: none;
-      border: none;
-      padding: 0.35rem 0.75rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #64748b;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .range-btn.active {
-      background: #0f172a;
-      color: #ffffff;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
-    }
-
-    .btn-action {
+    .live-status-pill {
       display: inline-flex;
       align-items: center;
+      gap: 0.4rem;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 0.25rem 0.7rem;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #475569;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+      animation: statusPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    .status-subtitle {
+      display: flex;
+      align-items: center;
       gap: 0.45rem;
-      padding: 0.55rem 1rem;
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+
+    .sep-dot {
+      color: #cbd5e1;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .select-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
       border-radius: 8px;
-      font-size: 0.84rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
+      padding: 0.5rem 0.8rem;
+      gap: 0.5rem;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
       transition: all 0.2s ease;
     }
 
-    .btn-secondary {
+    .select-container:focus-within {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .warehouse-dropdown {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #1e293b;
+      cursor: pointer;
+      appearance: none;
+      padding-right: 1.1rem;
+      font-family: inherit;
+    }
+
+    .btn-action-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
       background: #ffffff;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #cbd5e1;
       color: #334155;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.5rem 0.95rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+      font-family: inherit;
     }
 
-    .btn-secondary:hover {
+    .btn-action-outline:hover {
       background: #f8fafc;
-      border-color: #cbd5e1;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-      color: #ffffff;
-      border: 1px solid #1d4ed8;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-    }
-
-    .btn-primary:hover {
-      background: #1e40af;
+      border-color: #94a3b8;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
       transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
     }
 
-    /* KPI Grid */
-    .kpi-grid {
+    .btn-action-dark {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #0f172a;
+      border: 1px solid #0f172a;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.5rem 0.95rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+      font-family: inherit;
+    }
+
+    .btn-action-dark:hover {
+      background: #1e293b;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
+      transform: translateY(-1px);
+    }
+
+    .btn-action-blue {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border: 1px solid #1d4ed8;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.5rem 1.05rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+      font-family: inherit;
+    }
+
+    .btn-action-blue:hover {
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.42);
+      transform: translateY(-1px);
+    }
+
+    /* 2. KPIs Grid con elevación de tarjetas y sombras multicapa */
+    .kpis-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.75rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.15rem;
     }
 
     .kpi-card {
       background: #ffffff;
-      border: 1px solid #e2e8f0;
+      border: 1px solid rgba(226, 232, 240, 0.85);
       border-radius: 12px;
-      padding: 1.35rem 1.45rem;
+      padding: 1.15rem 1.25rem;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
-      transition: all 0.25s ease;
+      gap: 0.45rem;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .kpi-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-      border-color: #cbd5e1;
+      box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
+      border-color: rgba(203, 213, 225, 0.9);
     }
 
-    .kpi-top {
+    .kpi-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+      letter-spacing: -0.01em;
+    }
+
+    .kpi-icon-container {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    .blue-tint {
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+    }
+
+    .teal-tint {
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+    }
+
+    .red-tint {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+    }
+
+    .orange-tint {
+      background: #ffedd5;
+      border: 1px solid #fed7aa;
+    }
+
+    .kpi-big-value {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+      display: flex;
+      align-items: baseline;
+      gap: 0.35rem;
+    }
+
+    .alert-red-number {
+      color: #dc2626;
+    }
+
+    .alert-suffix, .order-suffix {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #475569;
+      letter-spacing: 0;
+    }
+
+    .kpi-bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.73rem;
+    }
+
+    .space-between {
+      justify-content: space-between;
+    }
+
+    .kpi-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.18rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+    }
+
+    .green-pill {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+
+    .red-pill {
+      background: #fee2e2;
+      color: #dc2626;
+      letter-spacing: 0.03em;
+    }
+
+    .kpi-caption {
+      color: #64748b;
+    }
+
+    .kpi-progress-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-top: 0.15rem;
+    }
+
+    .progress-bar-track {
+      flex: 1;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+      border-radius: 6px;
+    }
+
+    .progress-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #334155;
+      white-space: nowrap;
+    }
+
+    .delivery-rate {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #2563eb;
+    }
+
+    /* 3. Accesos Rápidos con Sombras Interactivas */
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.15rem;
+    }
+
+    .shortcut-card {
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 10px;
+      padding: 0.95rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    }
+
+    .shortcut-card:hover {
+      border-color: #cbd5e1;
+      background: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px -2px rgba(15, 23, 42, 0.08);
+    }
+
+    .shortcut-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
+    }
+
+    .shortcut-info {
+      flex: 1;
+    }
+
+    .shortcut-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+
+    .shortcut-desc {
+      font-size: 0.71rem;
+      color: #64748b;
+      margin: 0.12rem 0 0;
+    }
+
+    .shortcut-chevron {
+      color: #94a3b8;
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+
+    .shortcut-card:hover .shortcut-chevron {
+      color: #2563eb;
+      transform: translateX(3px);
+    }
+
+    /* 4. Sección Media (Gráfico + Reabastecimiento) */
+    .mid-section-grid {
+      display: grid;
+      grid-template-columns: 2.1fr 1fr;
+      gap: 1.15rem;
+    }
+
+    .weekly-chart-card {
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
+    }
+
+    .chart-header {
+      padding: 1.25rem 1.4rem 0.5rem;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.65rem;
+      align-items: flex-start;
     }
 
-    .kpi-label {
-      font-size: 0.72rem;
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .chart-subtitle {
+      font-size: 0.73rem;
+      color: #64748b;
+      margin: 0.2rem 0 0;
+    }
+
+    .chart-legend-group {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .legend-box {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .blue-box {
+      background: #3b82f6;
+    }
+
+    .dark-navy-box {
+      background: #1e293b;
+    }
+
+    .sem-tag {
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 0.18rem 0.5rem;
+      border-radius: 5px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .chart-canvas-container {
+      padding: 0.75rem 1.4rem 0.85rem;
+      position: relative;
+    }
+
+    .chart-svg {
+      width: 100%;
+      height: 175px;
+      overflow: visible;
+    }
+
+    .days-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 2rem 0;
+    }
+
+    .day-label {
+      font-size: 0.69rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .chart-summary-bar {
+      display: flex;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      border-radius: 0 0 12px 12px;
+      padding: 0.85rem 1.4rem;
+    }
+
+    .summary-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.18rem;
+    }
+
+    .summary-col:not(:last-child) {
+      border-right: 1px solid #e2e8f0;
+    }
+
+    .summary-label {
+      font-size: 0.64rem;
       font-weight: 700;
       letter-spacing: 0.06em;
       color: #64748b;
       text-transform: uppercase;
     }
 
-    .kpi-tag {
-      font-size: 0.68rem;
+    .summary-val {
+      font-size: 0.92rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .text-blue {
+      color: #2563eb;
+    }
+
+    .text-navy {
+      color: #1e293b;
+    }
+
+    .text-green {
+      color: #16a34a;
+    }
+
+    /* Reabastecimiento Card */
+    .restock-card {
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 12px;
+      padding: 1.25rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
+    }
+
+    .restock-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .restock-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .restock-title {
+      font-size: 0.95rem;
       font-weight: 700;
-      padding: 0.15rem 0.5rem;
-      border-radius: 6px;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin: 0;
     }
 
-    .trend-up {
-      background: #ecfdf5;
-      color: #059669;
+    .critical-count-pill {
+      background: #fee2e2;
+      color: #dc2626;
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 0.18rem 0.5rem;
+      border-radius: 5px;
+      border: 1px solid #fecaca;
     }
 
-    .trend-neutral {
-      background: #f1f5f9;
+    .restock-subtitle {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin: 0.4rem 0 0.85rem;
+      line-height: 1.35;
+    }
+
+    .restock-items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .restock-item {
+      padding: 0.6rem 0;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .item-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .item-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+    }
+
+    .badge-critical {
+      background: #fee2e2;
+      color: #dc2626;
+      font-size: 0.63rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid #fecaca;
+    }
+
+    .badge-low {
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 0.63rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid #fde68a;
+    }
+
+    .item-sku {
+      font-size: 0.69rem;
+      color: #64748b;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .item-stats-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.73rem;
       color: #475569;
     }
 
-    .kpi-main {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 0.75rem;
-    }
-
-    .kpi-value {
-      font-size: 1.75rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #0f172a;
-    }
-
-    .kpi-trend {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.2rem;
-      font-size: 0.78rem;
+    .text-red {
+      color: #dc2626;
       font-weight: 700;
     }
 
-    .kpi-trend.positive { color: #10b981; }
-    .kpi-trend.negative { color: #6366f1; }
-
-    .kpi-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 0.75rem;
-      border-top: 1px solid #f8fafc;
-    }
-
-    .kpi-caption {
-      font-size: 0.78rem;
-      color: #94a3b8;
-    }
-
-    /* Charts Row */
-    .charts-row {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 1.75rem;
-    }
-
-    .chart-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 1.5rem 1.65rem;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 18px -3px rgba(15, 23, 42, 0.05);
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.35rem;
-    }
-
-    .card-pretitle {
-      font-size: 0.68rem;
+    .text-amber {
+      color: #b45309;
       font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #94a3b8;
     }
 
-    .card-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #0f172a;
-      margin: 0.15rem 0 0 0;
-    }
-
-    .chart-legend {
-      display: flex;
-      gap: 1.1rem;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.76rem;
-      font-weight: 600;
+    .aisle-info {
+      font-size: 0.71rem;
       color: #64748b;
     }
 
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-
-    .legend-dot.in { background: #2563eb; }
-    .legend-dot.out { background: #818cf8; }
-
-    .chart-svg-container {
-      width: 100%;
-      height: 240px;
-    }
-
-    .responsive-svg {
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-
-    .chart-point {
-      transition: r 0.2s ease, stroke-width 0.2s ease;
+    .btn-solicitar {
+      margin-top: 0.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #2563eb;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 0.45rem;
+      border-radius: 6px;
       cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      font-family: inherit;
     }
 
-    .chart-point:hover {
-      r: 6.5;
-      stroke-width: 3.5;
+    .btn-solicitar:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+      transform: translateY(-1px);
     }
 
-    /* Donut Chart */
-    .donut-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.25rem;
-    }
-
-    .donut-svg-box {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0.5rem 0;
-    }
-
-    .donut-center-info {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .restock-footer {
+      margin-top: auto;
+      padding-top: 1rem;
       text-align: center;
     }
 
-    .donut-num {
-      font-size: 1.45rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #0f172a;
-      line-height: 1.1;
-    }
-
-    .donut-sub {
-      font-size: 0.68rem;
+    .catalog-link {
+      font-size: 0.77rem;
       font-weight: 600;
-      color: #94a3b8;
+      color: #2563eb;
+      text-decoration: none;
+      transition: color 0.15s ease;
     }
 
-    .donut-breakdown {
-      width: 100%;
+    .catalog-link:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    /* 5. Tabla de Transacciones Recientes */
+    .transactions-card {
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem 1rem;
       display: flex;
       flex-direction: column;
-      gap: 0.55rem;
-      padding-top: 0.5rem;
-      border-top: 1px solid #f1f5f9;
+      box-shadow: 0 1px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.04);
     }
 
-    .breakdown-item {
+    .table-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    .table-card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .table-card-subtitle {
+      font-size: 0.73rem;
+      color: #64748b;
+      margin: 0.2rem 0 0;
+    }
+
+    .table-controls {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      font-size: 0.8rem;
+      gap: 0.65rem;
+      flex-wrap: wrap;
     }
 
-    .color-pip {
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-      margin-right: 0.5rem;
-    }
-
-    .pip-blue { background: #2563eb; }
-    .pip-indigo { background: #6366f1; }
-    .pip-green { background: #10b981; }
-    .pip-amber { background: #f59e0b; }
-
-    .breakdown-name {
-      color: #475569;
-      font-weight: 500;
-      flex: 1;
-    }
-
-    .breakdown-val {
-      font-weight: 700;
-      color: #0f172a;
-    }
-
-    /* Bottom Split Row */
-    .bottom-split-row {
-      display: grid;
-      grid-template-columns: 1fr 1.6fr;
-      gap: 1.5rem;
-    }
-
-    .split-card {
+    .table-search-box {
+      display: flex;
+      align-items: center;
       background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 1.5rem 1.65rem;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 18px -3px rgba(15, 23, 42, 0.05);
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      gap: 0.45rem;
+      width: 220px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      transition: all 0.2s ease;
     }
 
-    .live-status {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #10b981;
-      background: #ecfdf5;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
+    .table-search-box:focus-within {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .count-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #475569;
-      background: #f1f5f9;
-      padding: 0.2rem 0.6rem;
-      border-radius: 6px;
-    }
-
-    /* Warehouses */
-    .warehouses-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1.15rem;
-    }
-
-    .wh-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      margin-bottom: 0.45rem;
-    }
-
-    .wh-name {
-      display: block;
-      font-size: 0.88rem;
-      font-weight: 700;
+    .table-search-input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 0.76rem;
       color: #0f172a;
+      width: 100%;
+      font-family: inherit;
     }
 
-    .wh-loc {
-      display: block;
-      font-size: 0.74rem;
+    .table-search-input::placeholder {
       color: #94a3b8;
     }
 
-    .wh-stat {
-      text-align: right;
-    }
-
-    .wh-percent {
-      display: block;
-      font-size: 0.95rem;
-      font-weight: 800;
-      color: #0f172a;
-    }
-
-    .wh-skus {
-      display: block;
-      font-size: 0.72rem;
-      color: #64748b;
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 7px;
-      background: #f1f5f9;
-      border-radius: 9999px;
+    .filter-tabs {
+      display: flex;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
       overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
-    .progress-bar {
-      height: 100%;
-      border-radius: 9999px;
-      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    .filter-tab-btn {
+      border: none;
+      background: transparent;
+      padding: 0.42rem 0.85rem;
+      font-size: 0.74rem;
+      font-weight: 500;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
     }
 
-    .bar-optimal {
-      background: linear-gradient(90deg, #3b82f6, #2563eb);
+    .filter-tab-btn:not(:last-child) {
+      border-right: 1px solid #e2e8f0;
     }
 
-    .bar-high {
-      background: linear-gradient(90deg, #f59e0b, #ea580c);
+    .filter-tab-btn.active {
+      background: #0f172a;
+      color: #ffffff;
+      font-weight: 600;
     }
 
-    /* Minimal Table */
-    .table-responsive {
+    .btn-table-refresh {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0.42rem 0.55rem;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .btn-table-refresh:hover {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #94a3b8;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .table-wrapper {
       overflow-x: auto;
     }
 
-    .minimal-table {
+    .inventory-table {
       width: 100%;
       border-collapse: collapse;
-      text-align: left;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
     }
 
-    .minimal-table th {
-      padding: 0.75rem 0.85rem;
-      font-size: 0.72rem;
+    .inventory-table th {
+      text-align: left;
+      padding: 0.75rem 0.95rem;
+      font-size: 0.67rem;
       font-weight: 700;
       letter-spacing: 0.05em;
-      text-transform: uppercase;
       color: #64748b;
       border-bottom: 1px solid #e2e8f0;
-      background-color: #f8fafc;
+      text-transform: uppercase;
+      background: #ffffff;
     }
 
-    .minimal-table td {
-      padding: 0.9rem 0.85rem;
-      border-bottom: 1px solid #f8fafc;
-      color: #334155;
-    }
-
-    .minimal-table tbody tr {
+    .inventory-table td {
+      padding: 0.85rem 0.95rem;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
       transition: background-color 0.15s ease;
     }
 
-    .minimal-table tbody tr:hover {
+    .inventory-table tbody tr:hover td {
       background-color: #f8fafc;
     }
 
-    .cell-product {
+    .product-cell {
       display: flex;
       flex-direction: column;
     }
 
-    .product-sku {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #2563eb;
-    }
-
     .product-title {
-      font-weight: 600;
+      font-weight: 700;
       color: #0f172a;
-    }
-
-    .cell-wh {
-      color: #64748b;
       font-size: 0.8rem;
+      letter-spacing: -0.01em;
     }
 
-    .op-tag {
-      display: inline-block;
-      font-size: 0.76rem;
+    .product-sku-detail {
+      font-size: 0.69rem;
+      color: #64748b;
+      margin-top: 0.1rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pill-type {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.22rem 0.6rem;
+      border-radius: 5px;
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 0.2rem 0.5rem;
-      border-radius: 6px;
+      letter-spacing: 0.03em;
     }
 
-    .op-tag.in {
+    .pill-type.entrada {
+      background: #dcfce7;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+
+    .pill-type.salida {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+
+    .pill-type.traspaso {
       background: #eff6ff;
-      color: #1d4ed8;
+      color: #2563eb;
+      border: 1px solid #dbeafe;
     }
 
-    .op-tag.out {
-      background: #fdf2f8;
-      color: #db2777;
+    .type-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
     }
 
-    .cell-val {
+    .qty-positive {
+      font-weight: 700;
+      color: #16a34a;
+    }
+
+    .qty-negative {
+      font-weight: 700;
+      color: #dc2626;
+    }
+
+    .qty-neutral {
       font-weight: 700;
       color: #0f172a;
+    }
+
+    .location-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .location-badge {
+      display: inline-block;
+      padding: 0.18rem 0.5rem;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.69rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .location-highlight {
+      background: #fef9c3;
+      border-color: #fef08a;
+      color: #a16207;
+    }
+
+    .arrow-sep {
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .operator-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .operator-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.64rem;
+      font-weight: 700;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    .operator-name {
+      color: #334155;
+      font-weight: 500;
+      font-size: 0.76rem;
+    }
+
+    .datetime-cell {
+      color: #475569;
+      font-size: 0.74rem;
     }
 
     .status-pill {
-      display: inline-block;
-      padding: 0.2rem 0.55rem;
-      border-radius: 9999px;
-      font-size: 0.72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.22rem 0.6rem;
+      border-radius: 14px;
+      font-size: 0.69rem;
       font-weight: 600;
     }
 
-    .status-pill.success {
+    .status-pill.completed {
       background: #ecfdf5;
+      border: 1px solid #a7f3d0;
       color: #059669;
     }
 
-    .status-pill.pending {
-      background: #eff6ff;
-      color: #2563eb;
-    }
-
-    .status-pill.review {
+    .status-pill.transit {
       background: #fffbeb;
+      border: 1px solid #fde68a;
       color: #d97706;
     }
 
-    .cell-time {
-      color: #94a3b8;
-      font-size: 0.76rem;
+    .status-pill.verification {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #475569;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+    .table-pagination-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 1rem;
+      border-top: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+      gap: 0.85rem;
     }
 
-    @media (max-width: 1100px) {
-      .charts-row, .bottom-split-row {
+    .pagination-count {
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-pag-nav {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 0.32rem 0.7rem;
+      font-size: 0.74rem;
+      color: #64748b;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-pag-nav:hover:not(:disabled) {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #94a3b8;
+    }
+
+    .btn-pag-nav:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-pag-num {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      color: #64748b;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-pag-num:hover:not(.active) {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #94a3b8;
+    }
+
+    .btn-pag-num.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .kpis-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .mid-section-grid {
         grid-template-columns: 1fr;
       }
-    }
-
-    @media (max-width: 768px) {
-      .enterprise-dashboard {
-        padding: 1.25rem 1rem;
-      }
-      .dashboard-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .header-controls {
-        width: 100%;
-        flex-wrap: wrap;
+      .shortcuts-grid {
+        grid-template-columns: 1fr;
       }
     }
   `]
@@ -984,163 +1716,181 @@ export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly authService = inject(AuthService);
 
-  selectedRange = '30D';
-  isLoading = false;
+  selectedWarehouse = 'central-a';
+  searchFilter = '';
+  activeTab = 'Todos';
 
-  // KPIs con Sparklines integrados
-  kpiMetrics: MetricItem[] = [
+  restockItems: RestockItem[] = [
     {
-      title: 'Valor Total del Stock',
-      value: '$842,520',
-      change: '+8.4%',
-      isPositive: true,
-      caption: 'vs. periodo anterior',
-      badge: 'VALORACIÓN',
-      sparkline: [20, 24, 22, 28, 35, 33, 40]
+      name: 'Microcontrolador ARM-32',
+      badge: 'CRÍTICO',
+      badgeType: 'critical',
+      sku: 'MCU-328P-T',
+      stockActual: '12 uds',
+      stockMin: 150,
+      aisle: 'Pasillo B-04'
     },
     {
-      title: 'Artículos en Existencia',
-      value: '34,890',
-      change: '+1,240',
-      isPositive: true,
-      caption: '98.4% disponibilidad',
-      badge: 'DISPONIBLE',
-      sparkline: [15, 18, 25, 23, 29, 34, 38]
+      name: 'Rodamiento Industrial 6204',
+      badge: 'BAJO',
+      badgeType: 'low',
+      sku: 'ROD-6204-2RS',
+      stockActual: '28 uds',
+      stockMin: 100,
+      aisle: 'Pasillo C-12'
     },
     {
-      title: 'Ocupación de Almacenes',
-      value: '76.8%',
-      change: 'Normal',
+      name: 'Cable Fibra Óptica OM4',
+      badge: 'BAJO',
+      badgeType: 'low',
+      sku: 'CAB-OM4-50M',
+      stockActual: '4 bobinas',
+      stockMin: 20,
+      aisle: 'Pasillo E-01'
+    }
+  ];
+
+  transactions: Transaction[] = [
+    {
+      sku: 'SEN-IR-5001',
+      product: 'Sensor Infrarrojo Proximidad',
+      detail: 'SEN-IR-5001 | Lote #9822',
+      type: 'ENTRADA',
+      quantity: '+450 uds',
       isPositive: true,
-      caption: '4 centros activos',
-      badge: 'CAPACIDAD',
-      sparkline: [30, 28, 29, 31, 30, 29, 31]
+      location: 'A-02-N1',
+      operator: 'Marcos Rivas',
+      operatorInitials: 'MR',
+      operatorBg: '#dbeafe',
+      operatorColor: '#1d4ed8',
+      dateTime: 'Hoy, 10:42 AM',
+      status: 'Completado'
     },
     {
-      title: 'Órdenes en Despacho',
-      value: '142',
-      change: '-3.1%',
+      sku: 'PWR-24V-10A',
+      product: 'Fuente de Alimentación 24V 10A',
+      detail: 'PWR-24V-10A | Despacho #4410',
+      type: 'SALIDA',
+      quantity: '-35 uds',
       isPositive: false,
-      caption: 'Tiempo prom. 18h',
-      badge: 'DESPACHOS',
-      sparkline: [40, 36, 32, 28, 25, 22, 18]
+      location: 'D-09-N3',
+      operator: 'Lucía Castro',
+      operatorInitials: 'LC',
+      operatorBg: '#ede9fe',
+      operatorColor: '#6d28d9',
+      dateTime: 'Hoy, 09:58 AM',
+      status: 'Completado'
+    },
+    {
+      sku: 'MOD-BLE-05',
+      product: 'Módulo Bluetooth 5.0 Low Energy',
+      detail: 'MOD-BLE-05 | Lote #3109',
+      type: 'TRASPASO',
+      quantity: '120 uds',
+      isPositive: false,
+      isNeutral: true,
+      location: 'B-01',
+      toLocation: 'C-04',
+      operator: 'Esteban Gil',
+      operatorInitials: 'EG',
+      operatorBg: '#cffafe',
+      operatorColor: '#0e7490',
+      dateTime: 'Hoy, 09:15 AM',
+      status: 'En Tránsito'
+    },
+    {
+      sku: 'ALU-4040-2M',
+      product: 'Perfil Aluminio Estructural 40x40',
+      detail: 'ALU-4040-2M | Despacho #4409',
+      type: 'SALIDA',
+      quantity: '-80 barras',
+      isPositive: false,
+      location: 'F-01-N0',
+      operator: 'Lucía Castro',
+      operatorInitials: 'LC',
+      operatorBg: '#ede9fe',
+      operatorColor: '#6d28d9',
+      dateTime: 'Hoy, 08:30 AM',
+      status: 'Completado'
+    },
+    {
+      sku: 'CON-M12-5P',
+      product: 'Conector Industrial M12 5-Pines',
+      detail: 'CON-M12-5P | Control de Calidad',
+      type: 'ENTRADA',
+      quantity: '+600 uds',
+      isPositive: true,
+      location: 'Z-CUAR-01',
+      locationHighlight: true,
+      operator: 'Marcos Rivas',
+      operatorInitials: 'MR',
+      operatorBg: '#dbeafe',
+      operatorColor: '#1d4ed8',
+      dateTime: 'Ayer, 18:20 PM',
+      status: 'En Verificación'
     }
   ];
 
-  // Puntos interactivos de la gráfica SVG
-  chartPoints = [
-    { month: 'Ene', x: 50, y: 175 },
-    { month: 'Feb', x: 160, y: 135 },
-    { month: 'Mar', x: 270, y: 110 },
-    { month: 'Abr', x: 380, y: 140 },
-    { month: 'May', x: 490, y: 80 },
-    { month: 'Jun', x: 600, y: 65 },
-    { month: 'Jul', x: 710, y: 48 }
-  ];
+  get filteredTransactions(): Transaction[] {
+    return this.transactions.filter(item => {
+      const matchesTab = 
+        this.activeTab === 'Todos' ||
+        (this.activeTab === 'Entradas' && item.type === 'ENTRADA') ||
+        (this.activeTab === 'Salidas' && item.type === 'SALIDA') ||
+        (this.activeTab === 'Traspasos' && item.type === 'TRASPASO');
 
-  // Datos de Almacenes y Capacidad
-  warehouses: WarehouseCapacity[] = [
-    { name: 'Hub Central Firmeza', location: 'Bogotá D.C. — Zona Franca', percentage: 88, skus: 14200, status: 'Alto' },
-    { name: 'Bodega Norte Logística', location: 'Medellín — Itagüí', percentage: 74, skus: 9840, status: 'Normal' },
-    { name: 'Centro de Distribución Occidente', location: 'Cali — Yumbo', percentage: 62, skus: 6360, status: 'Óptimo' },
-    { name: 'Nodo Portuario Caribe', location: 'Barranquilla — Malambo', percentage: 45, skus: 4490, status: 'Óptimo' }
-  ];
+      const matchesSearch = 
+        !this.searchFilter.trim() ||
+        item.product.toLowerCase().includes(this.searchFilter.toLowerCase()) ||
+        item.detail.toLowerCase().includes(this.searchFilter.toLowerCase()) ||
+        item.sku.toLowerCase().includes(this.searchFilter.toLowerCase());
 
-  // Actividad Reciente de Stock (Datos de demostración empresarial)
-  recentActivity: ActivityItem[] = [
-    {
-      id: 'TRX-1092',
-      sku: 'SKU-8921-A',
-      product: 'Válvula de Presión Industrial 2"',
-      warehouse: 'Hub Central Bogotá',
-      type: 'Entrada',
-      quantity: '+500 uds',
-      value: '$12,500',
-      status: 'Completado',
-      time: 'Hace 8 min'
-    },
-    {
-      id: 'TRX-1091',
-      sku: 'SKU-3402-B',
-      product: 'Sensor Óptico de Proximidad v4',
-      warehouse: 'Bodega Norte Medellín',
-      type: 'Despacho',
-      quantity: '-120 uds',
-      value: '$4,800',
-      status: 'En Tránsito',
-      time: 'Hace 32 min'
-    },
-    {
-      id: 'TRX-1090',
-      sku: 'SKU-1194-C',
-      product: 'Cojinete de Acero Reforzado 45mm',
-      warehouse: 'Hub Central Bogotá',
-      type: 'Ajuste',
-      quantity: '80 uds',
-      value: '$2,100',
-      status: 'Completado',
-      time: 'Hace 1 hora'
-    },
-    {
-      id: 'TRX-1089',
-      sku: 'SKU-9901-D',
-      product: 'Batería de Respaldo Litio 48V',
-      warehouse: 'Centro Distribución Cali',
-      type: 'Despacho',
-      quantity: '-45 uds',
-      value: '$6,750',
-      status: 'En Tránsito',
-      time: 'Hace 3 horas'
-    },
-    {
-      id: 'TRX-1088',
-      sku: 'SKU-4412-E',
-      product: 'Módulo de Control PLC-80',
-      warehouse: 'Nodo Portuario Caribe',
-      type: 'Entrada',
-      quantity: '+250 uds',
-      value: '$18,900',
-      status: 'En Verificación',
-      time: 'Hace 5 horas'
-    }
-  ];
+      return matchesTab && matchesSearch;
+    });
+  }
 
   ngOnInit(): void {
-    // Intentar sincronizar datos reales si existen en el backend sin bloquear la vista
+    // Sincronización transparente con el backend si existe
     this.dashboardService.getDashboardData().subscribe({
       next: (data) => {
-        if (data?.metrics) {
-          if (data.metrics.totalClients) {
-            this.kpiMetrics[1].value = data.metrics.totalClients.toString();
-          }
-          if (data.metrics.systemStatus) {
-            this.kpiMetrics[2].value = data.metrics.systemStatus;
-          }
-        }
+        // Datos adicionales pueden actualizar métricas si el backend está activo
       },
       error: () => {
-        // En ausencia de API, los datos de demostración mantienen la interfaz 100% interactiva
+        // Mantiene la vista perfectamente operativa de modo standalone
       }
     });
   }
 
-  refreshData(): void {
-    this.isLoading = true;
-    setTimeout(() => {
-      this.isLoading = false;
-    }, 600);
+  getStatusClass(status: string): string {
+    switch (status) {
+      case 'Completado': return 'completed';
+      case 'En Tránsito': return 'transit';
+      case 'En Verificación': return 'verification';
+      default: return '';
+    }
   }
 
-  getSparklinePath(points: number[]): string {
-    const step = 68 / (points.length - 1);
-    const max = Math.max(...points, 40);
-    const min = Math.min(...points, 10);
-    const range = max - min || 1;
+  onExportBalance(): void {
+    // Feedback visual o exportación
+  }
 
-    return points.reduce((path, val, idx) => {
-      const x = idx * step;
-      const y = 20 - ((val - min) / range) * 16;
-      return `${path} ${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
-    }, '');
+  onNewExit(): void {
+    // Apertura de modal o formulario
+  }
+
+  onRegisterEntry(): void {
+    // Apertura de modal o formulario
+  }
+
+  onShortcutClick(type: string): void {
+    // Acceso a terminales o auditorías
+  }
+
+  onRequestRestock(item: RestockItem): void {
+    // Solicitud rápida de pedido
+  }
+
+  refreshTransactions(): void {
+    // Refresco de datos
   }
 }

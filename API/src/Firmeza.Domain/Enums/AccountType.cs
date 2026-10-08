@@ -6,5 +6,6 @@ namespace Firmeza.Domain.Enums;
 public enum AccountType
 {
     Enterprise = 1,
-    Personal = 2
+    Personal = 2,
+    Employee = 3
 }

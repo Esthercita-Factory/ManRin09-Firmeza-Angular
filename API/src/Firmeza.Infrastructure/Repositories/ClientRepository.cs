@@ -1,5 +1,5 @@
+using Firmeza.Application.Interfaces;
 using Firmeza.Domain.Entities;
-using Firmeza.Domain.Interfaces;
 using Firmeza.Infrastructure.DbContext;
 using Microsoft.EntityFrameworkCore;
 

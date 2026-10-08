@@ -1,9 +1,10 @@
 services:
+  # 1. Base de Datos Relacional PostgreSQL
   postgres-db:
     build:
       context: ./DataBase
       dockerfile: Dockerfile
-    image: postgres:16-alpine
+    image: firmeza-postgres:latest
     container_name: firmeza-postgres
     restart: always
     environment:
@@ -15,6 +16,53 @@ services:
     volumes:
       - ./DataBase/Schema.sql:/docker-entrypoint-initdb.d/Schema.sql
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d FirmezaDb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - firmeza-net
+
+  # 2. Backend Web API (.NET 10)
+  api:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    image: firmeza-api:latest
+    container_name: firmeza-api
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5235
+      ConnectionStrings__DefaultConnection: Host=firmeza-postgres;Port=5432;Database=FirmezaDb;Username=postgres;Password=postgrespassword
+    ports:
+      - "5235:5235"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - firmeza-net
+
+  # 3. Frontend Cliente Web (Angular 19 / Nginx)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: firmeza-client:latest
+    container_name: firmeza-client
+    restart: always
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+    networks:
+      - firmeza-net
 
 volumes:
   postgres_data:
+    driver: local
+
+networks:
+  firmeza-net:
+    driver: bridge

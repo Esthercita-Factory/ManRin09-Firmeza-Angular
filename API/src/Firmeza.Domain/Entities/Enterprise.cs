@@ -27,6 +27,9 @@ public class Enterprise
     // Relación 1:N: una empresa tiene múltiples clientes asociados
     public ICollection<Client> Clients { get; set; } = [];
 
+    // Relación 1:N: una empresa tiene múltiples empleados contratados y administrados
+    public ICollection<Employee> Employees { get; set; } = [];
+
     // ==========================================
     // Vínculo 1:1 con ASP.NET Core Identity
     // ==========================================

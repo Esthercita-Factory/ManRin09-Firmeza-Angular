@@ -7,7 +7,7 @@ import { FormsModule } from '@angular/forms';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="plans-page">
+    <div class="fz-viewport">
       <!-- Top Navigation Bar -->
       <header class="top-nav">
         <div class="nav-left">
@@ -154,20 +154,6 @@ import { FormsModule } from '@angular/forms';
     </div>
   `,
   styles: [`
-    :host {
-      display: block;
-      min-height: 100vh;
-      background-color: #f6f9fc;
-      color: #1e293b;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-
-    .plans-page {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
     /* Top Navigation */
     .top-nav {
       display: flex;

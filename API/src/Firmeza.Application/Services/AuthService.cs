@@ -3,7 +3,6 @@ using Firmeza.Application.DTOs;
 using Firmeza.Application.Interfaces;
 using Firmeza.Domain.Entities;
 using Firmeza.Domain.Entities.Identity;
-using Firmeza.Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
 
 namespace Firmeza.Application.Services;

@@ -1,6 +1,6 @@
 using Firmeza.Domain.Entities;
 
-namespace Firmeza.Domain.Interfaces;
+namespace Firmeza.Application.Interfaces;
 
 public interface IClientRepository
 {

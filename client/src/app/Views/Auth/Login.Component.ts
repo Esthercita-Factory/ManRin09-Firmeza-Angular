@@ -92,42 +92,30 @@ import { ApiService } from '../../Services/Api.Service';
 
             <form (ngSubmit)="onLoginSubmit($event)" class="login-form">
               <div class="form-group">
-                <label>Correo Electrónico</label>
+                <label>Número de Cédula / Identificación</label>
                 <div class="input-wrapper">
                   <span class="input-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
+                      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                      <circle cx="9" cy="10" r="2"></circle>
+                      <line x1="15" y1="8" x2="17" y2="8"></line>
+                      <line x1="15" y1="12" x2="17" y2="12"></line>
+                      <line x1="7" y1="16" x2="17" y2="16"></line>
                     </svg>
                   </span>
-                  <input type="email" name="email" [(ngModel)]="email" placeholder="operador@firmeza.com" required />
+                  <input 
+                    type="text" 
+                    name="documentNumber" 
+                    [(ngModel)]="documentNumber" 
+                    (input)="onDocumentInput($event)"
+                    placeholder="Ej. 1098765432" 
+                    inputmode="numeric" 
+                    pattern="[0-9]*" 
+                    required 
+                    autocomplete="off" 
+                  />
                 </div>
-              </div>
-
-              <div class="form-group">
-                <div class="label-row">
-                  <label>Contraseña</label>
-                  <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
-                </div>
-                <div class="input-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
-                  </span>
-                  <input [type]="showPassword ? 'text' : 'password'" name="password" [(ngModel)]="password" placeholder="Introduce tu contraseña" required />
-                  <span class="toggle-eye" (click)="showPassword = !showPassword" title="Mostrar/Ocultar contraseña">
-                    <svg *ngIf="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    <svg *ngIf="showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  </span>
-                </div>
+                <span class="field-hint-text">Ingresa únicamente dígitos numéricos de tu cédula.</span>
               </div>
 
               <div class="checkbox-group">
@@ -476,6 +464,12 @@ import { ApiService } from '../../Services/Api.Service';
       gap: 0.45rem; 
     }
 
+    .field-hint-text {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-weight: 500;
+    }
+
     .label-row { 
       display: flex; 
       justify-content: space-between; 
@@ -648,9 +642,7 @@ import { ApiService } from '../../Services/Api.Service';
   `]
 })
 export class LoginComponent implements OnInit {
-  email = '';
-  password = '';
-  showPassword = false;
+  documentNumber = '';
   isLoading = false;
   loginMessage: string | null = null;
   loginError: string | null = null;
@@ -660,15 +652,32 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {}
 
+  onDocumentInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input) {
+      // Filtrar estrictamente caracteres no numéricos
+      const numericOnly = input.value.replace(/\D/g, '');
+      this.documentNumber = numericOnly;
+      input.value = numericOnly;
+    }
+  }
+
   onLoginSubmit(event?: Event): void {
     event?.preventDefault();
     this.loginError = null;
     this.loginMessage = null;
+
+    const cleanDocument = this.documentNumber.trim();
+    if (!cleanDocument) {
+      this.loginError = 'Por favor ingrese su número de cédula / identificación.';
+      return;
+    }
+
     this.isLoading = true;
 
     const credentials = {
-      email: this.email,
-      password: this.password
+      documentNumber: cleanDocument,
+      identificationNumber: cleanDocument
     };
 
     this.apiService.login(credentials).subscribe({

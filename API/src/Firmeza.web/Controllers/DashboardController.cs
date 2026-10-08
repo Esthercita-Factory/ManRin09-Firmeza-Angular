@@ -1,6 +1,6 @@
 using System.Security.Claims;
+using Firmeza.Application.Interfaces;
 using Firmeza.Domain.Entities.Identity;
-using Firmeza.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

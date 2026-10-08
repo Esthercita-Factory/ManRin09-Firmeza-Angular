@@ -3,7 +3,6 @@ using Firmeza.Application.Common.Interfaces;
 using Firmeza.Application.Interfaces;
 using Firmeza.Application.Services;
 using Firmeza.Domain.Entities.Identity;
-using Firmeza.Domain.Interfaces;
 using Firmeza.Infrastructure.DbContext;
 using Firmeza.Infrastructure.Repositories;
 using Firmeza.Infrastructure.Services;
@@ -70,6 +69,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 // Repositorios
 builder.Services.AddScoped<IEnterpriseRepository, EnterpriseRepository>();
 builder.Services.AddScoped<IClientRepository, ClientRepository>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 
 // Servicios de aplicación e infraestructura
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -77,6 +77,8 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
 
 // Configuración de autenticación JWT (Esquema por defecto para API REST Angular)
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

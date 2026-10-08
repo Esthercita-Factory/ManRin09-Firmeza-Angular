@@ -28,6 +28,23 @@ export const routes: Routes = [
       { 
         path: 'enterprises', 
         loadComponent: () => import('../Views/Enterprises/enterprises.component').then(m => m.EnterprisesComponent) 
+      },
+      { 
+        path: 'employees', 
+        loadComponent: () => import('../Views/Employees/employees.component').then(m => m.EmployeesComponent) 
+      },
+      { 
+        path: 'inventory', 
+        loadComponent: () => import('../Views/Inventory/inventory.component').then(m => m.InventoryComponent) 
+      },
+      { 
+        path: 'reports', 
+        loadComponent: () => import('../Views/Reports/reports.component').then(m => m.ReportsComponent) 
+      },
+      { 
+        path: 'analytics', 
+        redirectTo: 'reports', 
+        pathMatch: 'full' 
       }
     ]
   },

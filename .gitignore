@@ -3,3 +3,10 @@ bin/
 obj/
 **/bin/
 **/obj/
+**/publish/
+publish/
+**/dist/
+dist/
+**/node_modules/
+node_modules/
+.angular/
