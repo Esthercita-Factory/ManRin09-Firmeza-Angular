@@ -91,35 +91,128 @@ import { ApiService } from '../../Services/Api.Service';
             </div>
 
             <form (ngSubmit)="onLoginSubmit($event)" class="login-form">
-              <div class="form-group">
-                <label>Número de Cédula / Identificación</label>
-                <div class="input-wrapper">
-                  <span class="input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-                      <circle cx="9" cy="10" r="2"></circle>
-                      <line x1="15" y1="8" x2="17" y2="8"></line>
-                      <line x1="15" y1="12" x2="17" y2="12"></line>
-                      <line x1="7" y1="16" x2="17" y2="16"></line>
-                    </svg>
-                  </span>
+              <!-- Casilla / Checkbox para iniciar sesión como empleado -->
+              <div class="employee-toggle-card" [class.is-checked]="isEmployee">
+                <label class="employee-checkbox-label" for="employee-toggle">
                   <input 
-                    type="text" 
-                    name="documentNumber" 
-                    [(ngModel)]="documentNumber" 
-                    (input)="onDocumentInput($event)"
-                    placeholder="Ej. 1098765432" 
-                    inputmode="numeric" 
-                    pattern="[0-9]*" 
-                    required 
-                    autocomplete="off" 
+                    type="checkbox" 
+                    id="employee-toggle" 
+                    [(ngModel)]="isEmployee" 
+                    name="isEmployee"
+                    (change)="onToggleEmployee()"
                   />
-                </div>
-                <span class="field-hint-text">Ingresa únicamente dígitos numéricos de tu cédula.</span>
+                  <div class="employee-checkbox-content">
+                    <span class="employee-checkbox-title">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      </svg>
+                      Iniciar sesión como empleado
+                    </span>
+                    <span class="employee-checkbox-sub">Marca esta casilla si eres un colaborador registrado por tu empresa</span>
+                  </div>
+                </label>
               </div>
 
+              <!-- SI LA CASILLA ESTÁ MARCADA: Login de Empleado por Cédula -->
+              <ng-container *ngIf="isEmployee">
+                <div class="form-group">
+                  <label>Número de Cédula / Identificación del Empleado</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                        <circle cx="9" cy="10" r="2"></circle>
+                        <line x1="15" y1="8" x2="17" y2="8"></line>
+                        <line x1="15" y1="12" x2="17" y2="12"></line>
+                        <line x1="7" y1="16" x2="17" y2="16"></line>
+                      </svg>
+                    </span>
+                    <input 
+                      type="text" 
+                      name="documentNumber" 
+                      [(ngModel)]="documentNumber" 
+                      (input)="onDocumentInput($event)"
+                      placeholder="Ej. 1098765432" 
+                      inputmode="numeric" 
+                      pattern="[0-9]*" 
+                      required 
+                      autocomplete="off" 
+                    />
+                  </div>
+                  <span class="field-hint-text">Ingresa únicamente dígitos numéricos de tu cédula.</span>
+                </div>
+
+                <div class="employee-notice-banner">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  <span>Acceso para colaboradores autorizados. Recuerda que los empleados son registrados únicamente por su empresa empleadora desde su portal.</span>
+                </div>
+              </ng-container>
+
+              <!-- SI LA CASILLA NO ESTÁ MARCADA: Login regular (Empresas y Clientes) -->
+              <ng-container *ngIf="!isEmployee">
+                <div class="form-group">
+                  <label>Correo Electrónico</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                      </svg>
+                    </span>
+                    <input 
+                      type="email" 
+                      name="email" 
+                      [(ngModel)]="email" 
+                      placeholder="usuario@empresa.com" 
+                      required 
+                      autocomplete="email" 
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <div class="label-row">
+                    <label>Contraseña</label>
+                    <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
+                  </div>
+                  <div class="input-wrapper">
+                    <span class="input-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    </span>
+                    <input 
+                      [type]="showPassword ? 'text' : 'password'" 
+                      name="password" 
+                      [(ngModel)]="password" 
+                      placeholder="Introduce tu contraseña" 
+                      required 
+                      autocomplete="current-password" 
+                    />
+                    <span class="toggle-eye" (click)="showPassword = !showPassword" title="Mostrar/Ocultar contraseña">
+                      <svg *ngIf="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <svg *ngIf="showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </ng-container>
+
               <div class="checkbox-group">
-                <input type="checkbox" id="keep-session" />
+                <input type="checkbox" id="keep-session" [(ngModel)]="rememberSession" name="rememberSession" />
                 <label for="keep-session">Recordar esta sesión</label>
               </div>
 
@@ -132,13 +225,17 @@ import { ApiService } from '../../Services/Api.Service';
               </div>
 
               <button type="submit" class="btn-submit" [disabled]="isLoading">
-                <span *ngIf="!isLoading">Iniciar Sesión</span>
+                <span *ngIf="!isLoading">{{ isEmployee ? 'Iniciar Sesión como Empleado' : 'Iniciar Sesión' }}</span>
                 <span *ngIf="isLoading">Accediendo al sistema...</span>
               </button>
 
-              <div class="register-link">
+              <div *ngIf="!isEmployee" class="register-link">
                 <span>¿No tienes una cuenta aún?</span>
                 <a href="/register">Registrar organización</a>
+              </div>
+
+              <div *ngIf="isEmployee" class="register-link employee-portal-note">
+                <span>¿Aún no estás registrado? Solicita a tu empresa empleadora que te dé de alta en su portal.</span>
               </div>
             </form>
 
@@ -515,7 +612,7 @@ import { ApiService } from '../../Services/Api.Service';
       color: #64748b; 
     }
 
-    input, select { 
+    input:not([type="checkbox"]):not([type="radio"]), select { 
       border: none; 
       background: transparent; 
       outline: none; 
@@ -535,10 +632,103 @@ import { ApiService } from '../../Services/Api.Service';
     }
     .toggle-eye:hover { color: #1d4ed8; }
 
+    /* Estilos para la casilla de selección de modo Empleado */
+    .employee-toggle-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .employee-toggle-card:hover {
+      border-color: #cbd5e1;
+      background: #f1f5f9;
+    }
+    .employee-toggle-card.is-checked {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08);
+    }
+
+    .employee-checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      margin: 0;
+    }
+
+    .employee-checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      cursor: pointer;
+      accent-color: #1d4ed8;
+      flex-shrink: 0;
+    }
+
+    .employee-checkbox-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .employee-checkbox-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .employee-checkbox-sub {
+      font-size: 0.74rem;
+      color: #64748b;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .employee-notice-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.76rem;
+      color: #166534;
+      line-height: 1.45;
+    }
+
+    .employee-notice-banner svg {
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: #16a34a;
+    }
+
+    .employee-portal-note {
+      font-size: 0.76rem !important;
+      color: #64748b !important;
+      line-height: 1.45;
+    }
+
     .checkbox-group { 
       display: flex; 
       align-items: center; 
       gap: 0.6rem; 
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #1d4ed8;
+      flex-shrink: 0;
+      margin: 0;
     }
 
     .checkbox-group label { 
@@ -546,6 +736,7 @@ import { ApiService } from '../../Services/Api.Service';
       color: #64748b; 
       font-weight: 500; 
       cursor: pointer;
+      margin: 0;
     }
 
     .feedback-msg {
@@ -642,7 +833,12 @@ import { ApiService } from '../../Services/Api.Service';
   `]
 })
 export class LoginComponent implements OnInit {
+  isEmployee = false;
+  email = '';
+  password = '';
+  showPassword = false;
   documentNumber = '';
+  rememberSession = false;
   isLoading = false;
   loginMessage: string | null = null;
   loginError: string | null = null;
@@ -651,6 +847,11 @@ export class LoginComponent implements OnInit {
   private readonly router = inject(Router);
 
   ngOnInit(): void {}
+
+  onToggleEmployee(): void {
+    this.loginError = null;
+    this.loginMessage = null;
+  }
 
   onDocumentInput(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -667,18 +868,39 @@ export class LoginComponent implements OnInit {
     this.loginError = null;
     this.loginMessage = null;
 
-    const cleanDocument = this.documentNumber.trim();
-    if (!cleanDocument) {
-      this.loginError = 'Por favor ingrese su número de cédula / identificación.';
-      return;
+    let credentials: any;
+
+    if (this.isEmployee) {
+      const cleanDocument = this.documentNumber.trim();
+      if (!cleanDocument) {
+        this.loginError = 'Por favor ingrese su número de cédula / identificación.';
+        return;
+      }
+      credentials = {
+        isEmployee: true,
+        documentNumber: cleanDocument
+      };
+    } else {
+      const cleanEmail = this.email.trim();
+      const cleanPassword = this.password;
+
+      if (!cleanEmail) {
+        this.loginError = 'Por favor ingrese su correo electrónico.';
+        return;
+      }
+      if (!cleanPassword) {
+        this.loginError = 'Por favor ingrese su contraseña.';
+        return;
+      }
+
+      credentials = {
+        email: cleanEmail,
+        password: cleanPassword,
+        isEmployee: false
+      };
     }
 
     this.isLoading = true;
-
-    const credentials = {
-      documentNumber: cleanDocument,
-      identificationNumber: cleanDocument
-    };
 
     this.apiService.login(credentials).subscribe({
       next: (response: any) => {
@@ -693,11 +915,21 @@ export class LoginComponent implements OnInit {
           localStorage.setItem('token', token);
         }
 
-        this.router.navigate(['/app/dashboard']).then(success => {
-          if (!success) {
-            this.router.navigate(['/dashboard']);
-          }
-        });
+        const isEmp = this.isEmployee ||
+          response?.accountType === 'empleado' ||
+          response?.AccountType === 'empleado' ||
+          response?.role === 'Employee' ||
+          response?.Role === 'Employee';
+
+        if (isEmp) {
+          this.router.navigate(['/app/employee-dashboard']);
+        } else {
+          this.router.navigate(['/app/dashboard']).then(success => {
+            if (!success) {
+              this.router.navigate(['/dashboard']);
+            }
+          });
+        }
       },
       error: (err: any) => {
         this.isLoading = false;

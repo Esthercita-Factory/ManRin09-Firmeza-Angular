@@ -83,6 +83,39 @@ public class EmployeesController(
     }
 
     /// <summary>
+    /// Obtiene un empleado por su número de documento / cédula dentro de la empresa autenticada.
+    /// </summary>
+    [HttpGet("document/{documentNumber}")]
+    [ProducesResponseType(typeof(EmployeeResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByDocumentNumber(string documentNumber, CancellationToken cancellationToken)
+    {
+        var enterprise = await GetCurrentEnterpriseAsync();
+        if (enterprise is null)
+        {
+            return Unauthorized(new { message = "Solo una empresa registrada puede consultar sus empleados." });
+        }
+
+        var cleanDocument = documentNumber.Trim();
+        var employee = await employeeRepository.GetByDocumentNumberAsync(cleanDocument, cancellationToken);
+        if (employee is null || employee.EnterpriseId != enterprise.Id)
+        {
+            return NotFound(new { message = $"Empleado con documento '{cleanDocument}' no encontrado en su organización." });
+        }
+
+        return Ok(new EmployeeResponseDto(
+            employee.Id,
+            employee.DocumentNumber,
+            employee.FullName,
+            employee.Phone,
+            employee.Role,
+            employee.IsActive,
+            employee.CreatedAt,
+            employee.EnterpriseId
+        ));
+    }
+
+    /// <summary>
     /// Registra un nuevo empleado para la empresa autenticada.
     /// Valida que el documento de identificación sea único en el sistema.
     /// Permite asignar roles estándar o personalizados.

@@ -3,15 +3,29 @@ using System.ComponentModel.DataAnnotations;
 namespace Firmeza.Application.DTOs;
 
 /// <summary>
-/// DTO inmutable para la solicitud de inicio de sesión.
+/// DTO para la solicitud de inicio de sesión.
+/// Soporta acceso estándar corporativo/personal (Email y Contraseña) y acceso de empleado vía Cédula/Identificación.
 /// </summary>
-public sealed record LoginRequestDto(
-    [Required(ErrorMessage = "El correo electrónico es obligatorio."), EmailAddress, MaxLength(150)]
-    string Email,
+public sealed record LoginRequestDto
+{
+    [EmailAddress(ErrorMessage = "El formato de correo no es válido."), MaxLength(150)]
+    public string? Email { get; init; }
 
-    [Required(ErrorMessage = "La contraseña es obligatoria."), MinLength(6)]
-    string Password
-);
+    public string? Password { get; init; }
+
+    public bool IsEmployee { get; init; } = false;
+
+    [MaxLength(50)]
+    public string? DocumentNumber { get; init; }
+
+    public LoginRequestDto() { }
+
+    public LoginRequestDto(string email, string password)
+    {
+        Email = email;
+        Password = password;
+    }
+}
 
 /// <summary>
 /// DTO inmutable canónico para la respuesta de autenticación exitosa con JWT y metadatos del usuario.

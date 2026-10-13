@@ -16,7 +16,8 @@ public class AuthService(
     IJwtTokenGenerator jwtTokenGenerator,
     IClientRepository clientRepository,
     IEnterpriseRepository enterpriseRepository,
-    IPasswordHasher passwordHasher) : IAuthService
+    IPasswordHasher passwordHasher,
+    IEmployeeRepository employeeRepository) : IAuthService
 {
     /// <summary>
     /// Procesador unificado para solicitudes de registro enviadas desde el cliente Angular.
@@ -244,6 +245,54 @@ public class AuthService(
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        // Flujo 1: Inicio de sesión como Empleado (por casilla marcada o número de documento)
+        if (request.IsEmployee || !string.IsNullOrWhiteSpace(request.DocumentNumber))
+        {
+            var cleanDocument = (request.DocumentNumber ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(cleanDocument))
+            {
+                throw new UnauthorizedAccessException("Por favor ingrese su número de cédula / identificación.");
+            }
+
+            var employee = await employeeRepository.GetByDocumentNumberAsync(cleanDocument, cancellationToken);
+            if (employee == null)
+            {
+                throw new UnauthorizedAccessException("No se encontró ningún empleado registrado con este número de identificación. Los empleados son dados de alta exclusivamente por su empresa desde su portal.");
+            }
+
+            if (!employee.IsActive)
+            {
+                throw new UnauthorizedAccessException("Su cuenta de empleado se encuentra inactiva. Comuníquese con la administración de su empresa.");
+            }
+
+            var employeeRole = string.IsNullOrWhiteSpace(employee.Role) ? "Employee" : employee.Role;
+            var employeeEmail = $"{cleanDocument}@firmeza.internal";
+            var employeeToken = jwtTokenGenerator.GenerateToken(employee.Id.ToString(), employeeEmail, "Employee");
+            var employeeExpiration = DateTime.UtcNow.AddHours(8);
+
+            return new AuthResponseDto(
+                Token: employeeToken,
+                UserId: employee.Id.ToString(),
+                Email: employeeEmail,
+                Role: employeeRole,
+                FullName: employee.FullName,
+                Expiration: employeeExpiration,
+                AccountType: "empleado",
+                Message: $"Bienvenido, {employee.FullName}. Inicio de sesión completado."
+            );
+        }
+
+        // Flujo 2: Inicio de sesión regular (Empresas y Clientes)
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new UnauthorizedAccessException("El correo electrónico es obligatorio.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new UnauthorizedAccessException("La contraseña es obligatoria.");
+        }
 
         var cleanEmail = request.Email.Trim().ToLowerInvariant();
 

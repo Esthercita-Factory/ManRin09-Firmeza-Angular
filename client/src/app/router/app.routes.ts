@@ -4,13 +4,24 @@ import { LoginComponent } from '../Views/Auth/Login.Component';
 import { RegisterComponent } from '../Views/Auth/Register.Component';
 import { PlansComponent } from '../Views/Plans/Plans.Component';
 import { AdminLayoutComponent } from '../Layouts/admin-layout.component';
-import { authGuard } from '../Guards/auth.guard';
+import { authGuard, employeeOnlyGuard, enterpriseOnlyGuard } from '../Guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'plans', component: PlansComponent },
+  {
+    // Vista operativa exclusiva para Empleados
+    path: 'app/employee-dashboard',
+    canActivate: [authGuard, employeeOnlyGuard],
+    loadComponent: () => import('../Views/Dashboard/EmployeeDashboard.Component').then(m => m.EmployeeDashboardComponent)
+  },
+  {
+    path: 'employee-dashboard',
+    redirectTo: 'app/employee-dashboard',
+    pathMatch: 'full'
+  },
   {
     path: 'app',
     component: AdminLayoutComponent,
@@ -19,6 +30,7 @@ export const routes: Routes = [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { 
         path: 'dashboard', 
+        canActivate: [enterpriseOnlyGuard],
         loadComponent: () => import('../Views/Dashboard/Dashboard.Component').then(m => m.DashboardComponent) 
       },
       { 
@@ -31,6 +43,7 @@ export const routes: Routes = [
       },
       { 
         path: 'employees', 
+        canActivate: [enterpriseOnlyGuard],
         loadComponent: () => import('../Views/Employees/employees.component').then(m => m.EmployeesComponent) 
       },
       { 
@@ -51,7 +64,7 @@ export const routes: Routes = [
   {
     path: 'dashboard',
     component: AdminLayoutComponent,
-    canActivate: [authGuard],
+    canActivate: [authGuard, enterpriseOnlyGuard],
     children: [
       {
         path: '',

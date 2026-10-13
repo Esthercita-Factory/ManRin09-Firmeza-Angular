@@ -8,6 +8,8 @@ export interface UserSession {
   email: string;
   role: string;
   fullName?: string;
+  accountType?: string;
+  isEmployee?: boolean;
 }
 
 export interface AuthResponse {
@@ -15,6 +17,7 @@ export interface AuthResponse {
   email: string;
   role: string;
   expiration: string;
+  accountType?: string;
   message?: string;
 }
 
@@ -31,6 +34,7 @@ export class AuthService {
   // Reactividad moderna con Angular Signals
   readonly currentUser = signal<UserSession | null>(this.getStoredUser());
   readonly isAuthenticatedSignal = computed(() => !!this.currentUser() && !!this.getToken());
+
 
   private getStoredUser(): UserSession | null {
     try {
@@ -49,7 +53,9 @@ export class AuthService {
           const user: UserSession = {
             email: response.email,
             role: response.role,
-            fullName: data.companyName || data.name || `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim()
+            fullName: data.companyName || data.name || `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
+            accountType: 'empresa',
+            isEmployee: false
           };
           this.saveUser(user);
         }
@@ -61,13 +67,21 @@ export class AuthService {
     return this.http.post<any>(`${this.apiUrl}/login`, credentials).pipe(
       tap((response: any) => {
         const token = response?.token || response?.Token || response?.accessToken || response?.jwt;
+        const isEmp = credentials?.isEmployee === true ||
+          response?.accountType === 'empleado' ||
+          response?.AccountType === 'empleado' ||
+          response?.role === 'Employee' ||
+          response?.Role === 'Employee';
+
         if (token) {
           this.saveToken(token);
           const user: UserSession = {
             id: response?.userId || response?.UserId,
             email: response?.email || response?.Email || credentials?.email,
-            role: response?.role || response?.Role || 'User',
-            fullName: response?.fullName || response?.FullName
+            role: response?.role || response?.Role || (isEmp ? 'Employee' : 'User'),
+            fullName: response?.fullName || response?.FullName,
+            accountType: response?.accountType || response?.AccountType || (isEmp ? 'empleado' : 'empresa'),
+            isEmployee: isEmp
           };
           this.saveUser(user);
         }
@@ -91,6 +105,15 @@ export class AuthService {
 
   getUser(): UserSession | null {
     return this.currentUser();
+  }
+
+  isEmployee(): boolean {
+    const user = this.currentUser() || this.getStoredUser();
+    if (!user) return false;
+    return user.isEmployee === true ||
+      user.accountType === 'empleado' ||
+      user.role === 'Employee' ||
+      user.role === 'Empleado';
   }
 
   isAuthenticated(): boolean {
