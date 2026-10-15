@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Firmeza.web.Controllers;
+namespace Firmeza.Api.Controllers;
 
 /// <summary>
 /// Controlador API RESTful para la gestión de empleados.

@@ -53,7 +53,7 @@ export class AuthService {
           const user: UserSession = {
             email: response.email,
             role: response.role,
-            fullName: data.companyName || data.name || `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
+            fullName: data.companyName || data.name || '',
             accountType: 'empresa',
             isEmployee: false
           };

@@ -1,8 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
+import { InventoryComponent } from '../Inventory/inventory.component';
+import { EnterprisesComponent } from '../Enterprises/enterprises.component';
 
 interface AssignedTask {
   code: string;
@@ -35,7 +37,7 @@ interface ScheduledProvider {
 @Component({
   selector: 'app-employee-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, InventoryComponent, EnterprisesComponent],
   template: `
     <div class="employee-layout">
       <!-- 1. Barra Lateral de Navegación (Sidebar) -->
@@ -59,7 +61,7 @@ interface ScheduledProvider {
         <div class="nav-section-title">OPERACIÓN ALMACÉN</div>
 
         <nav class="sidebar-nav">
-          <a routerLink="/app/employee-dashboard" class="nav-item active">
+          <button type="button" (click)="setSection('dashboard')" class="nav-item" [class.active]="activeSection === 'dashboard'">
             <span class="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
@@ -69,9 +71,9 @@ interface ScheduledProvider {
               </svg>
             </span>
             <span class="nav-label">Panel Operativo</span>
-          </a>
+          </button>
 
-          <a routerLink="/app/inventory" class="nav-item">
+          <button type="button" (click)="setSection('inventory')" class="nav-item" [class.active]="activeSection === 'inventory'">
             <span class="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -80,20 +82,20 @@ interface ScheduledProvider {
               </svg>
             </span>
             <span class="nav-label">Inventario y Productos</span>
-          </a>
+          </button>
 
-          <a routerLink="/app/enterprises" class="nav-item">
+          <button type="button" (click)="setSection('movements')" class="nav-item" [class.active]="activeSection === 'movements'">
             <span class="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m7 16-4-4 4-4"></path>
-                <path d="M3 12h18"></path>
-                <path d="m17 8 4 4-4 4"></path>
+                <polyline points="7 16 3 12 7 8"></polyline>
+                <polyline points="17 8 21 12 17 16"></polyline>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
               </svg>
             </span>
             <span class="nav-label">Movimientos y Pedidos</span>
-          </a>
+          </button>
 
-          <a routerLink="/app/clients" class="nav-item">
+          <button type="button" (click)="setSection('providers')" class="nav-item" [class.active]="activeSection === 'providers'">
             <span class="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="3" width="15" height="13"></rect>
@@ -103,7 +105,7 @@ interface ScheduledProvider {
               </svg>
             </span>
             <span class="nav-label">Proveedores</span>
-          </a>
+          </button>
         </nav>
 
         <!-- Footer del Sidebar: Estación Activa -->
@@ -190,7 +192,7 @@ interface ScheduledProvider {
         </header>
 
         <!-- Contenido Operativo Scrollable -->
-        <div class="employee-content-area">
+        <div class="employee-content-area" *ngIf="activeSection === 'dashboard'">
           <!-- Banner de Bienvenida y Título -->
           <div class="title-banner">
             <div class="title-left">
@@ -207,7 +209,7 @@ interface ScheduledProvider {
             </div>
 
             <div class="title-actions">
-              <button class="btn-action-outline">
+              <button class="btn-action-outline" (click)="setSection('movements')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                   <polyline points="16 3 21 3 21 8"></polyline>
                   <line x1="4" y1="20" x2="21" y2="3"></line>
@@ -218,7 +220,7 @@ interface ScheduledProvider {
                 <span>Nuevo Movimiento Rápido</span>
               </button>
 
-              <button class="btn-action-primary">
+              <button class="btn-action-primary" (click)="setSection('inventory')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                   <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
                   <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
@@ -226,7 +228,7 @@ interface ScheduledProvider {
                   <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
                   <rect x="7" y="7" width="10" height="10" rx="1"></rect>
                 </svg>
-                <span>Escanear Código / SKU</span>
+                <span>Consultar Stock / SKU</span>
               </button>
             </div>
           </div>
@@ -644,7 +646,7 @@ interface ScheduledProvider {
                   </div>
                 </div>
 
-                <button class="btn-view-directory">
+                <button class="btn-view-directory" (click)="setSection('providers')">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="1" y="3" width="15" height="13"></rect>
                     <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
@@ -722,6 +724,89 @@ interface ScheduledProvider {
           </div>
         </div>
 
+        <!-- Vista Integrada: Inventario y Productos -->
+        <div class="employee-embedded-view" *ngIf="activeSection === 'inventory'">
+          <app-inventory></app-inventory>
+        </div>
+
+        <!-- Vista Integrada: Movimientos y Pedidos -->
+        <div class="employee-embedded-view" *ngIf="activeSection === 'movements'">
+          <app-enterprises></app-enterprises>
+        </div>
+
+        <!-- Vista Integrada: Proveedores (Recepción en Bahía) -->
+        <div class="employee-embedded-view" *ngIf="activeSection === 'providers'">
+          <div class="fz-viewport providers-embedded-page">
+            <header class="fz-header">
+              <div class="fz-header-left">
+                <div class="fz-header-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="3" width="15" height="13"></rect>
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                  </svg>
+                </div>
+                <div class="fz-header-titles">
+                  <div class="fz-title-row">
+                    <h1 class="fz-page-title">Directorio y Recepción de Proveedores</h1>
+                    <span class="fz-live-pill">
+                      <span class="fz-pulse-dot"></span>
+                      BAHÍA ACTIVA
+                    </span>
+                  </div>
+                  <div class="fz-subtitle">
+                    <span>Programación de descarga y manifiestos de fletes en curso</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fz-header-actions">
+                <button class="fz-btn fz-btn-dark" (click)="setSection('movements')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>Registrar Recepción de Carga</span>
+                </button>
+              </div>
+            </header>
+
+            <div class="panel-card mt-2">
+              <div class="panel-header-row mb-3">
+                <div>
+                  <h2 class="panel-title">Descargas Programadas en Patio y Rampas</h2>
+                  <p class="panel-subtitle">Manifiesto de fletes de materias primas y perfiles</p>
+                </div>
+              </div>
+              <div class="providers-list">
+                <div class="provider-item-card" *ngFor="let p of scheduledProviders">
+                  <div class="prov-top-row">
+                    <span class="prov-title">{{ p.name }}</span>
+                    <span [class]="p.statusClass">
+                      <span class="dot-pulse" *ngIf="p.status === 'Descargando'"></span>
+                      {{ p.status }}
+                    </span>
+                  </div>
+                  <div class="prov-time-row">
+                    <span>Llegada: {{ p.arrival }}</span>
+                    <span class="sep">•</span>
+                    <span>Rampa: {{ p.ramp }}</span>
+                    <span class="sep">•</span>
+                    <span>Carga: {{ p.cargo }}</span>
+                  </div>
+                  <div class="prov-progress-wrap" *ngIf="p.progress !== undefined">
+                    <div class="progress-bar-track">
+                      <div class="progress-bar-fill" [style.width.%]="p.progress"></div>
+                    </div>
+                    <span class="prov-progress-text">{{ p.progress }}% completado</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 5. Barra Inferior de Estado (Status Bar) -->
         <footer class="employee-statusbar">
           <div class="status-left">
@@ -757,13 +842,13 @@ interface ScheduledProvider {
 
     /* 1. SIDEBAR */
     .employee-sidebar {
-      width: 250px;
-      min-width: 250px;
+      width: 260px;
+      min-width: 260px;
       background: #ffffff;
       border-right: 1px solid #e2e8f0;
       display: flex;
       flex-direction: column;
-      padding: 1.25rem 1rem;
+      padding: 1.25rem 0.85rem;
       position: sticky;
       top: 0;
       height: 100vh;
@@ -813,32 +898,39 @@ interface ScheduledProvider {
     }
 
     .nav-section-title {
-      font-size: 0.7rem;
-      font-weight: 800;
+      font-size: 0.68rem;
+      font-weight: 700;
       color: #94a3b8;
-      letter-spacing: 0.06em;
-      padding: 0 0.5rem;
-      margin-bottom: 0.6rem;
+      letter-spacing: 0.08em;
+      padding: 0 0.85rem;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
     }
 
     .sidebar-nav {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.4rem;
       flex: 1;
     }
 
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.65rem 0.85rem;
-      border-radius: 8px;
-      color: #475569;
-      font-size: 0.86rem;
+      gap: 0.85rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      color: #334155;
+      font-size: 0.88rem;
       font-weight: 600;
       text-decoration: none;
-      transition: all 0.15s ease;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      width: 100%;
+      text-align: left;
+      transition: all 0.16s ease;
     }
 
     .nav-item:hover {
@@ -847,15 +939,34 @@ interface ScheduledProvider {
     }
 
     .nav-item.active {
-      background-color: #2563eb;
+      background: #2563eb;
       color: #ffffff;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      font-weight: 600;
+      box-shadow: 0 4px 14px -1px rgba(37, 99, 235, 0.4), 0 2px 6px -1px rgba(37, 99, 235, 0.25);
     }
 
     .nav-icon {
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .nav-label {
+      font-size: 0.875rem;
+      letter-spacing: -0.01em;
+    }
+
+    .employee-embedded-view {
+      flex: 1;
+      width: 100%;
+      animation: fzRise 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .providers-embedded-page {
+      padding: 1.5rem 1.75rem;
     }
 
     .sidebar-footer {
@@ -1084,6 +1195,18 @@ interface ScheduledProvider {
       flex-direction: column;
       gap: 1.25rem;
     }
+
+    .employee-content-area > *:not(.modal-overlay):not([class*="modal"]) {
+      animation-name: fzRise;
+      animation-duration: 0.5s;
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+      animation-fill-mode: backwards;
+    }
+    .employee-content-area > *:nth-child(1) { animation-delay: 0s; }
+    .employee-content-area > *:nth-child(2) { animation-delay: 0.05s; }
+    .employee-content-area > *:nth-child(3) { animation-delay: 0.1s; }
+    .employee-content-area > *:nth-child(4) { animation-delay: 0.15s; }
+    .employee-content-area > *:nth-child(n+5) { animation-delay: 0.2s; }
 
     /* TITLE BANNER */
     .title-banner {
@@ -2176,6 +2299,11 @@ export class EmployeeDashboardComponent implements OnInit {
   employeeRole = 'Operador Logístico';
   stockSearchInput = '';
   activeTab: 'all' | 'picking' | 'recepciones' = 'all';
+  activeSection: 'dashboard' | 'inventory' | 'movements' | 'providers' = 'dashboard';
+
+  setSection(section: 'dashboard' | 'inventory' | 'movements' | 'providers'): void {
+    this.activeSection = section;
+  }
 
   // Datos visuales basados exactamente en el diseño de la imagen
   tasksList: AssignedTask[] = [
@@ -2231,6 +2359,50 @@ export class EmployeeDashboardComponent implements OnInit {
       actionText: 'Rótulo',
       actionClass: 'outline',
       hasPrintIcon: true
+    }
+  ];
+
+  scheduledProviders: ScheduledProvider[] = [
+    {
+      name: 'Siderúrgica del Norte S.A.',
+      status: 'Descargando',
+      statusClass: 'pill-blue-downloading',
+      arrival: '10:30 AM',
+      ramp: '02',
+      cargo: '32 pallets perfiles H y vigas',
+      progress: 75,
+      actionText: 'Ver Albarán',
+      actionType: 'link'
+    },
+    {
+      name: 'FastenerTech Latam',
+      status: 'En Espera',
+      statusClass: 'pill-gray-waiting',
+      arrival: '13:00 PM',
+      ramp: '04',
+      cargo: 'Bulones, Pernos y Anclajes Estructurales',
+      actionText: 'Asignar Muelle',
+      actionType: 'button'
+    },
+    {
+      name: 'Cementos del Valle',
+      status: 'Programado',
+      statusClass: 'pill-gray-waiting',
+      arrival: '15:15 PM',
+      ramp: '01',
+      cargo: '18 TN Silos de Cemento Estructural',
+      actionText: 'En Horario',
+      actionType: 'badge'
+    },
+    {
+      name: 'Tubos y Aceros de Colombia',
+      status: 'Programado',
+      statusClass: 'pill-gray-waiting',
+      arrival: '16:45 PM',
+      ramp: '03',
+      cargo: '45 paquetes tubería galvanizada ISO',
+      actionText: 'En Tránsito',
+      actionType: 'badge'
     }
   ];
 

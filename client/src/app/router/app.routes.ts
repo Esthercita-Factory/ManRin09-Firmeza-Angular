@@ -34,10 +34,6 @@ export const routes: Routes = [
         loadComponent: () => import('../Views/Dashboard/Dashboard.Component').then(m => m.DashboardComponent) 
       },
       { 
-        path: 'clients', 
-        loadComponent: () => import('../Views/Clients/clients.component').then(m => m.ClientsComponent) 
-      },
-      { 
         path: 'enterprises', 
         loadComponent: () => import('../Views/Enterprises/enterprises.component').then(m => m.EnterprisesComponent) 
       },

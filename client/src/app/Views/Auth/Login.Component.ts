@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -155,7 +155,7 @@ import { ApiService } from '../../Services/Api.Service';
                 </div>
               </ng-container>
 
-              <!-- SI LA CASILLA NO ESTÁ MARCADA: Login regular (Empresas y Clientes) -->
+              <!-- SI LA CASILLA NO ESTÁ MARCADA: Login de Empresa -->
               <ng-container *ngIf="!isEmployee">
                 <div class="form-group">
                   <label>Correo Electrónico</label>
@@ -845,12 +845,14 @@ export class LoginComponent implements OnInit {
 
   private readonly apiService = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {}
 
   onToggleEmployee(): void {
     this.loginError = null;
     this.loginMessage = null;
+    this.cdr.detectChanges();
   }
 
   onDocumentInput(event: Event): void {
@@ -874,6 +876,7 @@ export class LoginComponent implements OnInit {
       const cleanDocument = this.documentNumber.trim();
       if (!cleanDocument) {
         this.loginError = 'Por favor ingrese su número de cédula / identificación.';
+        this.cdr.detectChanges();
         return;
       }
       credentials = {
@@ -886,10 +889,12 @@ export class LoginComponent implements OnInit {
 
       if (!cleanEmail) {
         this.loginError = 'Por favor ingrese su correo electrónico.';
+        this.cdr.detectChanges();
         return;
       }
       if (!cleanPassword) {
         this.loginError = 'Por favor ingrese su contraseña.';
+        this.cdr.detectChanges();
         return;
       }
 
@@ -915,11 +920,26 @@ export class LoginComponent implements OnInit {
           localStorage.setItem('token', token);
         }
 
+        const isClient = response?.accountType === 'persona' ||
+          response?.AccountType === 'persona' ||
+          response?.role === 'Client' ||
+          response?.Role === 'Client';
+
+        if (isClient) {
+          this.loginError = 'Acceso no permitido: El sistema está habilitado exclusivamente para Empresas y Empleados.';
+          localStorage.removeItem('firmeza_token');
+          localStorage.removeItem('token');
+          this.cdr.detectChanges();
+          return;
+        }
+
         const isEmp = this.isEmployee ||
           response?.accountType === 'empleado' ||
           response?.AccountType === 'empleado' ||
           response?.role === 'Employee' ||
           response?.Role === 'Employee';
+
+        this.cdr.detectChanges();
 
         if (isEmp) {
           this.router.navigate(['/app/employee-dashboard']);
@@ -933,7 +953,15 @@ export class LoginComponent implements OnInit {
       },
       error: (err: any) => {
         this.isLoading = false;
-        this.loginError = err?.error?.message || err?.error || err?.message || 'Error al iniciar sesión';
+        const msg =
+          err?.error?.message ||
+          (typeof err?.error === 'string' && err.error.trim().length > 0 ? err.error.trim() : null) ||
+          (typeof err?.error?.error === 'string' ? err.error.error : null) ||
+          (typeof err?.message === 'string' && !err.message.startsWith('Http failure') ? err.message : null) ||
+          'Los datos son invalidos';
+
+        this.loginError = msg;
+        this.cdr.detectChanges();
       }
     });
   }

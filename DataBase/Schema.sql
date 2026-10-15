@@ -180,4 +180,49 @@ VALUES ('20261008010422_AddEmployeesTable', '10.0.12');
 
 COMMIT;
 
+START TRANSACTION;
+
+CREATE TABLE "Products" (
+    "Id" uuid NOT NULL,
+    "Name" text NOT NULL,
+    "Price" numeric NOT NULL,
+    "Stock" integer NOT NULL,
+    "RegisteredById" uuid NOT NULL,
+    "CreatedAt" timestamp with time zone NOT NULL,
+    CONSTRAINT "PK_Products" PRIMARY KEY ("Id")
+);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014013218_AddProductsTable', '10.0.12');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE "Products" ALTER COLUMN "Price" TYPE numeric(18,2);
+ALTER TABLE "Products" ALTER COLUMN "Name" TYPE character varying(200);
+ALTER TABLE "Products" ADD "Barcode" character varying(100) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "Category" character varying(100) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "CategoryDetail" character varying(100) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "CostPrice" numeric(18,2) NOT NULL DEFAULT 0.0;
+ALTER TABLE "Products" ADD "Description" character varying(1000) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "EnterpriseId" integer;
+ALTER TABLE "Products" ADD "IsActive" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "Products" ADD "Location" character varying(100) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "MinStock" integer NOT NULL DEFAULT 0;
+ALTER TABLE "Products" ADD "Sku" character varying(100) NOT NULL DEFAULT '';
+ALTER TABLE "Products" ADD "StockReserved" integer NOT NULL DEFAULT 0;
+ALTER TABLE "Products" ADD "UpdatedAt" timestamp with time zone;
+
+CREATE INDEX "IX_Products_EnterpriseId" ON "Products" ("EnterpriseId");
+CREATE INDEX "IX_Products_Name" ON "Products" ("Name");
+CREATE INDEX "IX_Products_Sku" ON "Products" ("Sku");
+
+ALTER TABLE "Products" ADD CONSTRAINT "FK_Products_Enterprises_EnterpriseId" FOREIGN KEY ("EnterpriseId") REFERENCES "Enterprises" ("Id") ON DELETE RESTRICT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014235624_UpdateProductEntity', '10.0.12');
+
+COMMIT;
+
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -475,12 +475,6 @@ import { AuthService } from '../../Services/auth.service';
   `]
 })
 export class RegisterComponent implements OnInit {
-  accountType: 'empresa' | 'persona' = 'empresa';
-
-  // Datos Persona Natural
-  firstName = '';
-  lastName = '';
-
   // Datos Empresa
   companyName = '';
   taxId = '';
@@ -505,6 +499,7 @@ export class RegisterComponent implements OnInit {
 
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {}
 
@@ -515,32 +510,22 @@ export class RegisterComponent implements OnInit {
 
     if (this.password !== this.confirmPassword) {
       this.registerError = 'Las contraseñas no coinciden.';
+      this.cdr.detectChanges();
       return;
     }
 
     this.loading = true;
 
-    const payload = this.accountType === 'persona'
-      ? {
-          accountType: 'persona',
-          firstName: this.firstName,
-          lastName: this.lastName,
-          name: `${this.firstName} ${this.lastName}`.trim(),
-          fullName: `${this.firstName} ${this.lastName}`.trim(),
-          email: this.email,
-          phone: this.phone,
-          password: this.password
-        }
-      : {
-          accountType: 'empresa',
-          companyName: this.companyName,
-          taxId: this.taxId,
-          name: this.name,
-          fullName: this.name,
-          email: this.email,
-          phone: this.phone,
-          password: this.password
-        };
+    const payload = {
+      accountType: 'empresa',
+      companyName: this.companyName,
+      taxId: this.taxId,
+      name: this.name,
+      fullName: this.name,
+      email: this.email,
+      phone: this.phone,
+      password: this.password
+    };
 
     this.authService.register(payload).subscribe({
       next: (response: any) => {
@@ -548,6 +533,7 @@ export class RegisterComponent implements OnInit {
         this.registerMessage = typeof response === 'string'
           ? response
           : (response?.message || 'Registro exitoso');
+        this.cdr.detectChanges();
         if (response?.token) {
           this.router.navigate(['/app/dashboard']);
         } else {
@@ -556,7 +542,15 @@ export class RegisterComponent implements OnInit {
       },
       error: (err: any) => {
         this.loading = false;
-        this.registerError = err?.error?.message || err?.error || err?.message || 'Error al registrar';
+        const msg =
+          err?.error?.message ||
+          (typeof err?.error === 'string' && err.error.trim().length > 0 ? err.error.trim() : null) ||
+          (typeof err?.error?.error === 'string' ? err.error.error : null) ||
+          (typeof err?.message === 'string' && !err.message.startsWith('Http failure') ? err.message : null) ||
+          'Error al registrar la organización';
+
+        this.registerError = msg;
+        this.cdr.detectChanges();
       }
     });
   }

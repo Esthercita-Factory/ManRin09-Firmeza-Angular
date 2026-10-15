@@ -18,14 +18,22 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(clonedReq).pipe(
     catchError((error: HttpErrorResponse) => {
-      const isLoginRequest = req.url.toLowerCase().includes('login');
+      const isLoginRequest = req.url.toLowerCase().includes('login') || req.url.toLowerCase().includes('/auth');
 
-      // Si al iniciar sesión responde 401 (No autorizado) o usuario inexistente / credenciales inválidas (404 / 400)
-      if (isLoginRequest && (error.status === 401 || error.status === 404 || error.status === 400)) {
-        const customMessage = 'Los datos son invalidos';
+      // 1. Manejo universal de error 401 (No autorizado) en cualquier petición
+      if (error.status === 401) {
+        // Extraer mensaje devuelto por el backend si existe, o usar el mensaje predeterminado
+        const serverMessage =
+          error.error?.message ||
+          (typeof error.error === 'string' && error.error.trim().length > 0 ? error.error.trim() : null) ||
+          error.error?.error ||
+          error.error?.title;
+
+        const customMessage = serverMessage || (isLoginRequest ? 'Los datos son invalidos' : 'Su sesión ha expirado o no está autorizado. Inicie sesión nuevamente.');
+
         const customError = new HttpErrorResponse({
           error: { message: customMessage, error: customMessage },
-          status: error.status,
+          status: 401,
           statusText: 'Unauthorized',
           headers: error.headers,
           url: error.url ?? undefined
@@ -34,13 +42,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => customError);
       }
 
-      // Manejo general de 401 en autenticación
-      if (error.status === 401 && (isLoginRequest || req.url.toLowerCase().includes('/auth'))) {
-        const customMessage = 'Los datos son invalidos';
+      // 2. Errores de inicio de sesión (404 o 400 con credenciales o empleado inexistente)
+      if (isLoginRequest && (error.status === 404 || error.status === 400)) {
+        const serverMessage =
+          error.error?.message ||
+          (typeof error.error === 'string' && error.error.trim().length > 0 ? error.error.trim() : null) ||
+          error.error?.error;
+
+        const customMessage = serverMessage || 'Los datos son invalidos';
+
         const customError = new HttpErrorResponse({
           error: { message: customMessage, error: customMessage },
-          status: 401,
-          statusText: 'Unauthorized',
+          status: error.status,
+          statusText: error.statusText || 'Bad Request',
           headers: error.headers,
           url: error.url ?? undefined
         });

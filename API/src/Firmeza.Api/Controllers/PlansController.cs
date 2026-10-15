@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace Firmeza.web.Controllers;
+namespace Firmeza.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

@@ -22,7 +22,7 @@ export interface MovementItem {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="movements-view">
+    <div class="fz-viewport movements-view">
       <!-- 1. Encabezado Principal de Movimientos -->
       <header class="header-section">
         <div class="header-titles">
@@ -304,10 +304,16 @@ export interface MovementItem {
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+    }
+
     .movements-view {
-      padding: 1.75rem 2rem;
       max-width: 1400px;
       margin: 0 auto;
+      width: 100%;
     }
 
     .header-section {
@@ -353,6 +359,7 @@ export interface MovementItem {
       border-radius: 50%;
       background: #2563eb;
       box-shadow: 0 0 6px rgba(37, 99, 235, 0.8);
+      animation: fzPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
     }
 
     .page-subtitle {

@@ -13,22 +13,22 @@ import { AuthService } from '../Services/auth.service';
       <aside class="sidebar" [class.collapsed]="isSidebarCollapsed">
         <!-- Brand / Logotipo -->
         <div class="sidebar-brand">
-          <a routerLink="/app/dashboard" class="brand-link">
+          <a [routerLink]="isEmployee ? '/app/employee-dashboard' : '/app/dashboard'" class="brand-link">
             <span class="brand-logo">
               <img src="/favicon.png" width="22" height="22" alt="Firmeza IMS" style="border-radius: 4px; display: block;" />
             </span>
             <div class="brand-text">
               <span class="brand-title">Firmeza</span>
-              <span class="brand-subtitle">ENTERPRISE IMS</span>
+              <span class="brand-subtitle">{{ brandSubtitle }}</span>
             </div>
           </a>
         </div>
 
         <!-- Navegación Primaria -->
         <nav class="sidebar-nav">
-          <span class="nav-heading">GESTIÓN PRINCIPAL</span>
+          <span class="nav-heading">{{ isEmployee ? 'OPERACIÓN ALMACÉN' : 'GESTIÓN PRINCIPAL' }}</span>
 
-          <a routerLink="/app/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: false}" class="nav-item">
+          <a [routerLink]="isEmployee ? '/app/employee-dashboard' : '/app/dashboard'" routerLinkActive="active" [routerLinkActiveOptions]="{exact: false}" class="nav-item">
             <span class="nav-icon">
               <!-- Grid 4 cuadrados -->
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -38,7 +38,7 @@ import { AuthService } from '../Services/auth.service';
                 <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
               </svg>
             </span>
-            <span class="nav-label">Dashboard / Inicio</span>
+            <span class="nav-label">{{ isEmployee ? 'Panel Operativo' : 'Dashboard / Inicio' }}</span>
           </a>
 
           <a routerLink="/app/inventory" routerLinkActive="active" class="nav-item">
@@ -70,7 +70,7 @@ import { AuthService } from '../Services/auth.service';
               <!-- Camión proveedores -->
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="3" width="15" height="13"></rect>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
                 <circle cx="5.5" cy="18.5" r="2.5"></circle>
                 <circle cx="18.5" cy="18.5" r="2.5"></circle>
               </svg>
@@ -78,7 +78,7 @@ import { AuthService } from '../Services/auth.service';
             <span class="nav-label">Proveedores</span>
           </a>
 
-          <a routerLink="/app/reports" routerLinkActive="active" class="nav-item">
+          <a *ngIf="!isEmployee" routerLink="/app/reports" routerLinkActive="active" class="nav-item">
             <span class="nav-icon">
               <!-- Gráfica analíticas -->
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -90,7 +90,7 @@ import { AuthService } from '../Services/auth.service';
             <span class="nav-label">Reportes y Analíticas</span>
           </a>
 
-          <a routerLink="/app/employees" routerLinkActive="active" class="nav-item">
+          <a *ngIf="!isEmployee" routerLink="/app/employees" routerLinkActive="active" class="nav-item">
             <span class="nav-icon">
               <!-- Icono Usuarios / Empleados -->
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -103,7 +103,7 @@ import { AuthService } from '../Services/auth.service';
             <span class="nav-label">Administrar Empleados</span>
           </a>
 
-          <a routerLink="/app/dashboard" class="nav-item">
+          <a *ngIf="!isEmployee" routerLink="/app/dashboard" class="nav-item">
             <span class="nav-icon">
               <!-- Engranaje configuración -->
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -628,7 +628,15 @@ export class AdminLayoutComponent {
   }
 
   get userRole(): string {
-    return this.currentUser?.role || 'Super Administrador';
+    return this.currentUser?.role || (this.isEmployee ? 'Operador Logístico' : 'Super Administrador');
+  }
+
+  get isEmployee(): boolean {
+    return this.authService.isEmployee();
+  }
+
+  get brandSubtitle(): string {
+    return this.isEmployee ? 'INS ENTERPRISE' : 'ENTERPRISE IMS';
   }
 
   logout(): void {
