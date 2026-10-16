@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Firmeza.web.Controllers;
+namespace Firmeza.Api.Controllers;
 
 /// <summary>
 /// Controlador protegido para el suministro de datos consolidados del Dashboard.

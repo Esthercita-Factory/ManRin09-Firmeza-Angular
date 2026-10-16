@@ -557,6 +557,12 @@ interface CategoryValue {
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+    }
+
     .header-titles {
       display: flex;
       flex-direction: column;
