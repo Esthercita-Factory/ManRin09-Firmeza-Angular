@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
 import { ProductsService, ProductItem } from '../../Services/products.service';
 
@@ -290,7 +291,7 @@ interface BatchExpiryItem {
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let item of filteredProducts" [class.selected-row]="item.selected">
+              <tr *ngFor="let item of filteredProducts; trackBy: trackBySku" [class.selected-row]="item.selected">
                 <td class="td-checkbox">
                   <input type="checkbox" [(ngModel)]="item.selected" class="custom-checkbox" />
                 </td>
@@ -1519,8 +1520,12 @@ interface BatchExpiryItem {
     }
   `]
 })
-export class InventoryComponent implements OnInit {
+export class InventoryComponent implements OnInit, OnDestroy {
   private readonly productsService = inject(ProductsService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private productsSub?: Subscription;
 
   searchQuery = '';
   selectedCategory = 'all';
@@ -1536,19 +1541,34 @@ export class InventoryComponent implements OnInit {
     this.loadProducts();
   }
 
+  ngOnDestroy(): void {
+    this.productsSub?.unsubscribe();
+  }
+
+  trackBySku(_: number, item: ProductItem): string {
+    return item.id || item.sku;
+  }
+
   loadProducts(): void {
-    console.log('[Inventario] Cargando productos desde ProductsService / API...');
+    console.log('[Inventario] Conectando suscripción en tiempo real...');
+    this.productsSub = this.productsService.products$.subscribe((items) => {
+      this.ngZone.run(() => {
+        this.products = [...(items || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
     this.productsService.getProducts().subscribe({
       next: (data) => {
-        this.products = data || [];
+        this.ngZone.run(() => {
+          this.products = [...(data || [])];
+          this.cdr.detectChanges();
+        });
       },
       error: (err) => {
         console.warn('[Inventario] Error cargando productos:', err);
+        this.cdr.detectChanges();
       }
-    });
-
-    this.productsService.products$.subscribe((items) => {
-      this.products = items || [];
     });
   }
 
@@ -1652,7 +1672,10 @@ export class InventoryComponent implements OnInit {
         salePrice: '$75.00'
       }).subscribe({
         next: (created) => {
-          this.products = [created, ...this.products.filter(p => p.sku !== created.sku)];
+          this.ngZone.run(() => {
+            this.products = [created, ...this.products.filter(p => p.sku !== created.sku && p.id !== created.id)];
+            this.cdr.detectChanges();
+          });
           Swal.fire({
             position: 'top-end',
             icon: 'success',
@@ -1662,6 +1685,7 @@ export class InventoryComponent implements OnInit {
           });
         },
         error: (err) => {
+          this.cdr.detectChanges();
           Swal.fire({
             position: 'top-end',
             icon: 'warning',
@@ -1754,7 +1778,10 @@ export class InventoryComponent implements OnInit {
         imageIcon: item.imageIcon
       }).subscribe({
         next: (updated) => {
-          this.products = this.products.map(p => (p.id === item.id || p.sku === item.sku) ? updated : p);
+          this.ngZone.run(() => {
+            this.products = this.products.map(p => (p.id === item.id || p.sku === item.sku) ? updated : p);
+            this.cdr.detectChanges();
+          });
           Swal.fire({
             position: 'top-end',
             icon: 'success',
@@ -1764,6 +1791,7 @@ export class InventoryComponent implements OnInit {
           });
         },
         error: (err) => {
+          this.cdr.detectChanges();
           Swal.fire({
             position: 'top-end',
             icon: 'warning',
@@ -1791,7 +1819,10 @@ export class InventoryComponent implements OnInit {
     if (result.isConfirmed) {
       this.productsService.deleteProduct(item.id || item.sku).subscribe({
         next: () => {
-          this.products = this.products.filter(p => p.id !== item.id && p.sku !== item.sku);
+          this.ngZone.run(() => {
+            this.products = this.products.filter(p => p.id !== item.id && p.sku !== item.sku);
+            this.cdr.detectChanges();
+          });
           Swal.fire({
             position: 'top-end',
             icon: 'success',
@@ -1801,6 +1832,7 @@ export class InventoryComponent implements OnInit {
           });
         },
         error: (err) => {
+          this.cdr.detectChanges();
           Swal.fire({
             position: 'top-end',
             icon: 'warning',

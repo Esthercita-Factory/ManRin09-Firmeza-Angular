@@ -1,7 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { DashboardService } from '../../Services/dashboard.service';
 import { AuthService } from '../../Services/auth.service';
 import { ProductsService, ProductItem } from '../../Services/products.service';
@@ -462,7 +463,7 @@ interface RestockItem {
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let prod of filteredProductsList">
+              <tr *ngFor="let prod of filteredProductsList; trackBy: trackBySku">
                 <td>
                   <div class="product-cell">
                     <span class="product-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;">{{ prod.sku }}</span>
@@ -1822,10 +1823,14 @@ interface RestockItem {
     }
   `]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private readonly dashboardService = inject(DashboardService);
   private readonly authService = inject(AuthService);
   private readonly productsService = inject(ProductsService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private productsSub?: Subscription;
 
   selectedWarehouse = 'central-a';
   searchFilter = '';
@@ -1949,17 +1954,34 @@ export class DashboardComponent implements OnInit {
     this.loadProducts();
   }
 
+  ngOnDestroy(): void {
+    this.productsSub?.unsubscribe();
+  }
+
+  trackBySku(_: number, prod: ProductItem): string {
+    return prod.id || prod.sku;
+  }
+
   loadProducts(): void {
-    console.log('[Dashboard] Consultando productos a través de ProductsService...');
-    this.productsService.getProducts().subscribe({
-      next: (items) => {
-        this.products = items || [];
-      },
-      error: (err) => console.warn('[Dashboard] Error cargando productos:', err)
+    console.log('[Dashboard] Suscripción en tiempo real a ProductsService...');
+    this.productsSub = this.productsService.products$.subscribe((items) => {
+      this.ngZone.run(() => {
+        this.products = [...(items || [])];
+        this.cdr.detectChanges();
+      });
     });
 
-    this.productsService.products$.subscribe((items) => {
-      this.products = items || [];
+    this.productsService.getProducts().subscribe({
+      next: (items) => {
+        this.ngZone.run(() => {
+          this.products = [...(items || [])];
+          this.cdr.detectChanges();
+        });
+      },
+      error: (err) => {
+        console.warn('[Dashboard] Error cargando productos:', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 

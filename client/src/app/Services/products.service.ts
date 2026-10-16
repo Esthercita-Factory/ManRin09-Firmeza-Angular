@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, BehaviorSubject, of, tap, catchError } from 'rxjs';
+import { Observable, BehaviorSubject, of, timer, Subscription, switchMap, tap, catchError, map } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export interface ProductItem {
@@ -52,8 +52,8 @@ export interface UpdateProductRequest {
 
 /**
  * Servicio unificado de Productos e Inventario para la plataforma Firmeza.
- * Consume el endpoint /api/products para abastecer tanto el Dashboard de Empresa
- * como el Dashboard de Empleado y el Catálogo de Inventario.
+ * Sincronización en tiempo real mediante Signals, BehaviorSubject,
+ * polling activo continuo contra /api/products y eventos inter-pestañas.
  */
 @Injectable({
   providedIn: 'root'
@@ -63,9 +63,96 @@ export class ProductsService {
   private readonly authService = inject(AuthService);
   private readonly apiUrl = 'http://localhost:5235/api/products';
 
-  // Reactividad para compartir la lista de productos en tiempo real
+  // Reactividad dual: BehaviorSubject y Signal nativo
   private readonly productsSubject = new BehaviorSubject<ProductItem[]>(this.getStoredProducts());
   readonly products$ = this.productsSubject.asObservable();
+  readonly productsSignal = signal<ProductItem[]>(this.getStoredProducts());
+
+  private pollingSub?: Subscription;
+
+  constructor() {
+    this.initRealtimeSync();
+  }
+
+  private normalizeProduct(raw: any): ProductItem {
+    const rawStockStr = String(raw.stockAvailable ?? raw.stockTotal ?? raw.stock ?? '0');
+    const stockVal = parseInt(rawStockStr.replace(/[^0-9-]/g, ''), 10) || 0;
+    const isCrit = stockVal < 5;
+
+    return {
+      id: String(raw.id || raw.sku || ''),
+      sku: String(raw.sku || ''),
+      barcode: String(raw.barcode || ''),
+      name: String(raw.name || ''),
+      category: String(raw.category || 'General'),
+      categoryDetail: String(raw.categoryDetail || 'Inventario Firmeza'),
+      hasRedDot: isCrit,
+      imageIcon: raw.imageIcon || '📦',
+      location: String(raw.location || 'Nave A-P01-R1'),
+      locationIcon: raw.locationIcon || 'standard',
+      stockTotal: raw.stockTotal ? String(raw.stockTotal) : `${stockVal} Unid.`,
+      stockReserved: raw.stockReserved ? String(raw.stockReserved) : '0',
+      stockAvailable: raw.stockAvailable ? String(raw.stockAvailable) : `${stockVal}`,
+      isCriticalStock: isCrit,
+      stockLevelPercent: typeof raw.stockLevelPercent === 'number' ? raw.stockLevelPercent : Math.min(100, Math.max(5, stockVal * 10)),
+      stockStatus: isCrit ? 'STOCK CRÍTICO' : (raw.stockStatus || (stockVal <= 20 ? 'ESTABLE' : 'ÓPTIMO')),
+      stockStatusClass: isCrit ? 'critical' : (raw.stockStatusClass || (stockVal <= 20 ? 'stable' : 'optimal')),
+      costPrice: String(raw.costPrice || '$10.00'),
+      salePrice: String(raw.salePrice || '$15.00'),
+      lastMovement: String(raw.lastMovement || 'Recién registrado'),
+      selected: !!raw.selected
+    };
+  }
+
+  private hasChanges(a: ProductItem[], b: ProductItem[]): boolean {
+    if (a.length !== b.length) return true;
+    for (let i = 0; i < a.length; i++) {
+      if (
+        a[i].id !== b[i].id ||
+        a[i].sku !== b[i].sku ||
+        a[i].stockTotal !== b[i].stockTotal ||
+        a[i].stockAvailable !== b[i].stockAvailable ||
+        a[i].name !== b[i].name ||
+        a[i].salePrice !== b[i].salePrice
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private initRealtimeSync(): void {
+    // 1. Sincronización instantánea entre pestañas / ventanas del navegador
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'firmeza_products' && event.newValue) {
+          try {
+            const parsed = JSON.parse(event.newValue);
+            if (Array.isArray(parsed)) {
+              const normalized = parsed.map(p => this.normalizeProduct(p));
+              this.productsSubject.next(normalized);
+              this.productsSignal.set(normalized);
+            }
+          } catch {}
+        }
+      });
+    }
+
+    // 2. Polling activo en tiempo real contra la API cada 2.5s
+    this.pollingSub = timer(500, 2500).pipe(
+      switchMap(() => this.http.get<any[]>(this.apiUrl, { headers: this.getAuthHeaders() }).pipe(
+        catchError(() => of(null))
+      ))
+    ).subscribe((apiData) => {
+      if (apiData && Array.isArray(apiData)) {
+        const normalized = apiData.map(p => this.normalizeProduct(p));
+        const current = this.productsSubject.value;
+        if (this.hasChanges(current, normalized)) {
+          this.saveStoredProducts(normalized);
+        }
+      }
+    });
+  }
 
   private getAuthHeaders(): HttpHeaders {
     const token = this.authService.getToken();
@@ -82,8 +169,9 @@ export class ProductsService {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          // Filtrar cualquier producto mock antiguo
-          return parsed.filter(p => !['PER-IPE-200', 'BUL-HEX-123', 'CEM-EST-050', 'SOL-6011-18', 'TUB-EST-404'].includes(p.sku));
+          return parsed
+            .filter(p => !['PER-IPE-200', 'BUL-HEX-123', 'CEM-EST-050', 'SOL-6011-18', 'TUB-EST-404'].includes(p.sku))
+            .map(p => this.normalizeProduct(p));
         }
       }
     } catch {}
@@ -93,18 +181,20 @@ export class ProductsService {
   private saveStoredProducts(items: ProductItem[]): void {
     try {
       localStorage.setItem('firmeza_products', JSON.stringify(items));
-      this.productsSubject.next(items);
+      this.productsSubject.next([...items]);
+      this.productsSignal.set([...items]);
     } catch {}
   }
 
   getProducts(): Observable<ProductItem[]> {
-    console.log('[ProductsService] Consultando lista de productos desde API:', this.apiUrl);
-    return this.http.get<ProductItem[]>(this.apiUrl, { headers: this.getAuthHeaders() }).pipe(
-      tap((apiProducts) => {
+    return this.http.get<any[]>(this.apiUrl, { headers: this.getAuthHeaders() }).pipe(
+      map((apiProducts) => {
         if (Array.isArray(apiProducts)) {
-          console.log('[ProductsService] Productos recibidos desde API:', apiProducts.length);
-          this.saveStoredProducts(apiProducts);
+          const normalized = apiProducts.map(p => this.normalizeProduct(p));
+          this.saveStoredProducts(normalized);
+          return normalized;
         }
+        return this.productsSubject.value;
       }),
       catchError((err) => {
         console.warn('[ProductsService] Error consultando API de productos, usando caché/estado local:', err);
@@ -114,28 +204,27 @@ export class ProductsService {
   }
 
   getProductById(id: string): Observable<ProductItem | null> {
-    return this.http.get<ProductItem>(`${this.apiUrl}/${id}`, { headers: this.getAuthHeaders() }).pipe(
+    return this.http.get<any>(`${this.apiUrl}/${id}`, { headers: this.getAuthHeaders() }).pipe(
+      map(p => p ? this.normalizeProduct(p) : null),
       catchError(() => of(this.productsSubject.value.find(p => p.id === id || p.sku === id) || null))
     );
   }
 
   createProduct(request: CreateProductRequest): Observable<ProductItem> {
-    console.log('[ProductsService] Registrando nuevo producto en API:', request);
-    return this.http.post<ProductItem>(this.apiUrl, request, { headers: this.getAuthHeaders() }).pipe(
+    return this.http.post<any>(this.apiUrl, request, { headers: this.getAuthHeaders() }).pipe(
+      map(p => this.normalizeProduct(p)),
       tap((newProduct) => {
-        console.log('[ProductsService] Producto creado con éxito:', newProduct);
         const current = this.productsSubject.value;
-        const updated = [newProduct, ...current.filter(p => p.sku !== newProduct.sku)];
+        const updated = [newProduct, ...current.filter(p => p.sku !== newProduct.sku && p.id !== newProduct.id)];
         this.saveStoredProducts(updated);
       })
     );
   }
 
   updateProduct(id: string, request: UpdateProductRequest): Observable<ProductItem> {
-    console.log('[ProductsService] Actualizando producto en API:', id, request);
-    return this.http.put<ProductItem>(`${this.apiUrl}/${id}`, request, { headers: this.getAuthHeaders() }).pipe(
+    return this.http.put<any>(`${this.apiUrl}/${id}`, request, { headers: this.getAuthHeaders() }).pipe(
+      map(p => this.normalizeProduct(p)),
       tap((updated) => {
-        console.log('[ProductsService] Producto actualizado con éxito:', updated);
         const current = this.productsSubject.value;
         const updatedList = current.map(p => (p.id === id || p.sku === id) ? updated : p);
         this.saveStoredProducts(updatedList);

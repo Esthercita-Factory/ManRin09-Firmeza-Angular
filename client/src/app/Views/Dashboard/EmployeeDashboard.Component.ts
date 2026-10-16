@@ -1,7 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../../Services/auth.service';
 import { ProductsService, ProductItem } from '../../Services/products.service';
 
@@ -333,7 +334,7 @@ interface ScheduledProvider {
 
                     <!-- Mini lista de resultados interactivos en tiempo real -->
                     <div *ngIf="products.length > 0" style="margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 120px; overflow-y: auto;">
-                      <div *ngFor="let p of filteredCatalogProducts.slice(0, 3)" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.72rem;">
+                      <div *ngFor="let p of filteredCatalogProducts.slice(0, 3); trackBy: trackBySku" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.72rem;">
                         <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden;">
                           <span>{{ p.imageIcon }}</span>
                           <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">
@@ -2089,10 +2090,14 @@ interface ScheduledProvider {
     }
   `]
 })
-export class EmployeeDashboardComponent implements OnInit {
+export class EmployeeDashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly productsService = inject(ProductsService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private productsSub?: Subscription;
 
   employeeName = 'Carlos Mendoza';
   employeeRole = 'Operador Logístico';
@@ -2169,17 +2174,34 @@ export class EmployeeDashboardComponent implements OnInit {
     this.loadProducts();
   }
 
+  ngOnDestroy(): void {
+    this.productsSub?.unsubscribe();
+  }
+
+  trackBySku(_: number, p: ProductItem): string {
+    return p.id || p.sku;
+  }
+
   loadProducts(): void {
-    console.log('[EmployeeDashboard] Consultando productos a través de ProductsService...');
-    this.productsService.getProducts().subscribe({
-      next: (items) => {
-        this.products = items || [];
-      },
-      error: (err) => console.warn('[EmployeeDashboard] Error cargando productos:', err)
+    console.log('[EmployeeDashboard] Suscripción en tiempo real a ProductsService...');
+    this.productsSub = this.productsService.products$.subscribe((items) => {
+      this.ngZone.run(() => {
+        this.products = [...(items || [])];
+        this.cdr.detectChanges();
+      });
     });
 
-    this.productsService.products$.subscribe((items) => {
-      this.products = items || [];
+    this.productsService.getProducts().subscribe({
+      next: (items) => {
+        this.ngZone.run(() => {
+          this.products = [...(items || [])];
+          this.cdr.detectChanges();
+        });
+      },
+      error: (err) => {
+        console.warn('[EmployeeDashboard] Error cargando productos:', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 
