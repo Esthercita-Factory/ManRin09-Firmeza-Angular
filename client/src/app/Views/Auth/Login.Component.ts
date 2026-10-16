@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../Services/Api.Service';
+import { AuthService, UserSession } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -844,6 +845,7 @@ export class LoginComponent implements OnInit {
   loginError: string | null = null;
 
   private readonly apiService = inject(ApiService);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
   ngOnInit(): void {}
@@ -910,26 +912,46 @@ export class LoginComponent implements OnInit {
           : (response?.message || 'Inicio de sesión exitoso');
 
         const token = response?.token || response?.Token || response?.accessToken;
-        if (token) {
-          localStorage.setItem('firmeza_token', token);
-          localStorage.setItem('token', token);
-        }
+        const role = response?.role || response?.Role || (this.isEmployee ? 'Employee' : 'Enterprise');
+        const accountType = response?.accountType || response?.AccountType || (this.isEmployee ? 'empleado' : 'empresa');
 
         const isEmp = this.isEmployee ||
-          response?.accountType === 'empleado' ||
-          response?.AccountType === 'empleado' ||
-          response?.role === 'Employee' ||
-          response?.Role === 'Employee';
+          accountType === 'empleado' ||
+          role === 'Employee' ||
+          role === 'Empleado';
 
-        if (isEmp) {
-          this.router.navigate(['/app/employee-dashboard']);
-        } else {
-          this.router.navigate(['/app/dashboard']).then(success => {
-            if (!success) {
-              this.router.navigate(['/dashboard']);
-            }
-          });
+        // Limpiar completamente cualquier residuo de sesión anterior
+        localStorage.removeItem('firmeza_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('firmeza_user');
+        localStorage.removeItem('firmeza_account_type');
+
+        if (token) {
+          this.authService.saveToken(token);
         }
+
+        const user: UserSession = {
+          id: response?.userId || response?.UserId || (isEmp ? this.documentNumber : undefined),
+          email: response?.email || response?.Email || (isEmp ? `${this.documentNumber}@firmeza.internal` : this.email),
+          role: isEmp ? 'Employee' : role,
+          fullName: response?.fullName || response?.FullName || (isEmp ? 'Operario Firmeza' : 'Administrador'),
+          accountType: isEmp ? 'empleado' : 'empresa',
+          isEmployee: isEmp
+        };
+
+        this.authService.saveUser(user);
+        localStorage.setItem('firmeza_account_type', isEmp ? 'empleado' : 'empresa');
+
+        const targetRoute = isEmp ? '/app/employee-dashboard' : '/app/dashboard';
+        this.router.navigateByUrl(targetRoute).then(success => {
+          if (!success) {
+            this.router.navigate([targetRoute]).then(fallbackSuccess => {
+              if (!fallbackSuccess && !isEmp) {
+                this.router.navigateByUrl('/dashboard');
+              }
+            });
+          }
+        });
       },
       error: (err: any) => {
         this.isLoading = false;

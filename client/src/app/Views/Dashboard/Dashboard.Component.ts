@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../Services/dashboard.service';
 import { AuthService } from '../../Services/auth.service';
+import { ProductsService, ProductItem } from '../../Services/products.service';
 
 interface Transaction {
   sku: string;
@@ -143,7 +144,7 @@ interface RestockItem {
               </svg>
             </div>
           </div>
-          <div class="kpi-big-value">8,420</div>
+          <div class="kpi-big-value">{{ products.length > 0 ? (products.length | number) : '8,420' }}</div>
           <div class="kpi-progress-row">
             <div class="progress-bar-track">
               <div class="progress-bar-fill" style="width: 94%;"></div>
@@ -373,8 +374,11 @@ interface RestockItem {
             <p class="restock-subtitle">Artículos que han sobrepasado su punto mínimo de reorden calculado por volumen.</p>
           </div>
 
-          <!-- Lista de 3 Artículos Críticos -->
+          <!-- Lista de Artículos Críticos -->
           <div class="restock-items-list">
+            <div *ngIf="restockItems.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+              No hay solicitudes críticas de reabastecimiento pendientes.
+            </div>
             <div *ngFor="let item of restockItems" class="restock-item">
               <div class="item-title-row">
                 <span class="item-name">{{ item.name }}</span>
@@ -404,7 +408,113 @@ interface RestockItem {
         </div>
       </section>
 
-      <!-- 5. Tabla de Movimientos y Transacciones Recientes -->
+      <!-- 5. Catálogo de Productos Registrados (ProductsService) -->
+      <section class="transactions-card" style="margin-bottom: 1.5rem;">
+        <div class="table-top-bar">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <h2 class="table-card-title">Catálogo y Control de Productos</h2>
+              <span class="live-status-pill">
+                <span class="pulse-dot"></span>
+                ENDPOINT: /api/products
+              </span>
+            </div>
+            <p class="table-card-subtitle">Productos activos del almacén sincronizados en tiempo real mediante ProductsService</p>
+          </div>
+
+          <div class="table-controls">
+            <!-- Buscador de productos -->
+            <div class="table-search-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input 
+                type="text" 
+                [(ngModel)]="productsSearchFilter" 
+                placeholder="Buscar por SKU, nombre..." 
+                class="table-search-input"
+              />
+            </div>
+
+            <!-- Botón Ir a Inventario -->
+            <a routerLink="/app/inventory" class="btn-action-blue" style="text-decoration: none; padding: 0.45rem 0.85rem; font-size: 0.78rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              </svg>
+              <span>Gestionar en Inventario</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Tabla de Productos -->
+        <div class="table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>SKU / CÓD. BARRAS</th>
+                <th>PRODUCTO Y CATEGORÍA</th>
+                <th>UBICACIÓN BODEGA</th>
+                <th>STOCK TOTAL / DISP.</th>
+                <th>ESTADO</th>
+                <th>PRECIO VENTA</th>
+                <th>ÚLTIMO MOV.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let prod of filteredProductsList">
+                <td>
+                  <div class="product-cell">
+                    <span class="product-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;">{{ prod.sku }}</span>
+                    <span class="product-sku-detail">{{ prod.barcode }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="product-cell" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.25rem;">{{ prod.imageIcon }}</span>
+                    <div>
+                      <span class="product-title">{{ prod.name }}</span>
+                      <span class="product-sku-detail">{{ prod.category }} • {{ prod.categoryDetail }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="location-cell">
+                    <span class="location-badge">{{ prod.location }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span [class]="isUnderFive(prod) ? 'qty-negative' : 'qty-positive'">
+                    {{ prod.stockTotal }}
+                  </span>
+                  <div *ngIf="isUnderFive(prod)" style="font-size: 0.65rem; color: #dc2626; font-weight: 700;">⚠️ &lt; 5 CRÍTICO</div>
+                  <div style="font-size: 0.68rem; color: #64748b;">({{ prod.stockAvailable }} disp.)</div>
+                </td>
+                <td>
+                  <span [class]="'status-pill ' + (isUnderFive(prod) ? 'transit' : 'completed')" [style.background]="isUnderFive(prod) ? '#fee2e2' : ''" [style.color]="isUnderFive(prod) ? '#dc2626' : ''">
+                    {{ isUnderFive(prod) ? 'STOCK CRÍTICO' : prod.stockStatus }}
+                  </span>
+                </td>
+                <td>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #0f172a;">
+                    {{ prod.salePrice }}
+                  </span>
+                </td>
+                <td>
+                  <span class="datetime-cell">{{ prod.lastMovement }}</span>
+                </td>
+              </tr>
+              <tr *ngIf="filteredProductsList.length === 0">
+                <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                  No se encontraron productos coincidentes en el almacén.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. Tabla de Movimientos y Transacciones Recientes -->
       <section class="transactions-card">
         <div class="table-top-bar">
           <div>
@@ -1715,40 +1825,16 @@ interface RestockItem {
 export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly authService = inject(AuthService);
+  private readonly productsService = inject(ProductsService);
 
   selectedWarehouse = 'central-a';
   searchFilter = '';
+  productsSearchFilter = '';
   activeTab = 'Todos';
 
-  restockItems: RestockItem[] = [
-    {
-      name: 'Microcontrolador ARM-32',
-      badge: 'CRÍTICO',
-      badgeType: 'critical',
-      sku: 'MCU-328P-T',
-      stockActual: '12 uds',
-      stockMin: 150,
-      aisle: 'Pasillo B-04'
-    },
-    {
-      name: 'Rodamiento Industrial 6204',
-      badge: 'BAJO',
-      badgeType: 'low',
-      sku: 'ROD-6204-2RS',
-      stockActual: '28 uds',
-      stockMin: 100,
-      aisle: 'Pasillo C-12'
-    },
-    {
-      name: 'Cable Fibra Óptica OM4',
-      badge: 'BAJO',
-      badgeType: 'low',
-      sku: 'CAB-OM4-50M',
-      stockActual: '4 bobinas',
-      stockMin: 20,
-      aisle: 'Pasillo E-01'
-    }
-  ];
+  products: ProductItem[] = [];
+
+  restockItems: RestockItem[] = [];
 
   transactions: Transaction[] = [
     {
@@ -1850,15 +1936,49 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Sincronización transparente con el backend si existe
+    console.log('[Dashboard] Solicitando métricas consolidadas desde la base de datos/API...');
     this.dashboardService.getDashboardData().subscribe({
       next: (data) => {
-        // Datos adicionales pueden actualizar métricas si el backend está activo
+        console.log('[Dashboard] Datos recibidos desde la base de datos:', data);
       },
-      error: () => {
-        // Mantiene la vista perfectamente operativa de modo standalone
+      error: (err) => {
+        console.warn('[Dashboard] Sin respuesta o error de conexión con API de dashboard:', err);
       }
     });
+
+    this.loadProducts();
+  }
+
+  loadProducts(): void {
+    console.log('[Dashboard] Consultando productos a través de ProductsService...');
+    this.productsService.getProducts().subscribe({
+      next: (items) => {
+        this.products = items || [];
+      },
+      error: (err) => console.warn('[Dashboard] Error cargando productos:', err)
+    });
+
+    this.productsService.products$.subscribe((items) => {
+      this.products = items || [];
+    });
+  }
+
+  isUnderFive(prod: ProductItem): boolean {
+    const qty = parseInt(prod.stockAvailable || prod.stockTotal || '0', 10);
+    return isNaN(qty) ? false : (qty < 5 || prod.stockStatusClass === 'critical' || prod.stockStatus === 'STOCK CRÍTICO');
+  }
+
+  get filteredProductsList(): ProductItem[] {
+    if (!this.productsSearchFilter.trim()) {
+      return this.products;
+    }
+    const term = this.productsSearchFilter.toLowerCase();
+    return this.products.filter(p =>
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      p.category.toLowerCase().includes(term) ||
+      p.location.toLowerCase().includes(term)
+    );
   }
 
   getStatusClass(status: string): string {

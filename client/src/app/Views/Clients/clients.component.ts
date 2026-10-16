@@ -596,8 +596,11 @@ interface ProductCatalogItem {
           </button>
         </div>
 
-        <!-- Cuadrícula de 8 Productos -->
+        <!-- Cuadrícula de Productos -->
         <div class="products-grid">
+          <div *ngIf="filteredProducts.length === 0" style="grid-column: 1 / -1; padding: 2.5rem; text-align: center; color: #64748b; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5e1;">
+            No hay productos cargados en el catálogo actualmente.
+          </div>
           <div *ngFor="let prod of filteredProducts" class="product-grid-card">
             <!-- Badges superiores -->
             <div class="card-badges-row">
@@ -2268,122 +2271,7 @@ export class ClientsComponent implements OnInit {
   ];
   selectedCategory = 'Todos los Suministros';
 
-  products: ProductCatalogItem[] = [
-    {
-      id: 'P1',
-      sku: 'SKU: SNS-IR-P01',
-      brand: 'Omron Tech',
-      name: 'Sensor Fotoeléctrico Infrarrojo M18 PNP N.A. 24VDC',
-      price: 890.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Mayoreo (10+): $795.00 MXN',
-      stockText: 'Naucalpan: 48 uds',
-      badge: 'RECOMPRA FRECUENTE',
-      badgeType: 'frequent',
-      quantity: 2,
-      category: 'Sensores y Automatización',
-      svgType: 'sensor'
-    },
-    {
-      id: 'P2',
-      sku: 'SKU: PWR-24V-10A',
-      brand: 'Mean Well Ind',
-      name: 'Fuente de Poder Conmutada Riel DIN 24V DC 240W 10A',
-      price: 1480.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Mayoreo (5+): $1,320.00 MXN',
-      stockText: 'Naucalpan: 19 uds',
-      badge: 'RECOMPRA FRECUENTE',
-      badgeType: 'frequent',
-      quantity: 1,
-      category: 'Fuentes & Control 24V',
-      svgType: 'power'
-    },
-    {
-      id: 'P3',
-      sku: 'SKU: RDM-SKF-6205',
-      brand: 'SKF Explore',
-      name: 'Rodamiento Rígido de Bolas 6205-2RSH/C3 25x52x15mm',
-      price: 245.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Caja x20: $4,100.00 MXN',
-      stockText: 'Hub Central: 120 uds',
-      badge: 'EXPRESS 24H',
-      badgeType: 'express',
-      quantity: 4,
-      category: 'Transmisión y Rodamientos',
-      svgType: 'bearing'
-    },
-    {
-      id: 'P4',
-      sku: 'SKU: PLC-MOD-IO',
-      brand: 'Firmeza Core',
-      name: 'Módulo Controlador I/O Ethernet Modbus TCP/IP Industrial',
-      price: 3120.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Soporte técnico directo incluido',
-      stockText: 'Naucalpan: 14 uds',
-      badge: 'NUEVO LOTE',
-      badgeType: 'new',
-      quantity: 1,
-      category: 'Sensores y Automatización',
-      svgType: 'plc'
-    },
-    {
-      id: 'P5',
-      sku: 'SKU: TRN-G8.8-KIT',
-      brand: 'TorqMax Pro',
-      name: 'Kit Tornillería Hexagonal Grado 8.8 Pavonada M8/M10 (500 pzas)',
-      price: 1150.00,
-      priceUnit: '/ kit',
-      bulkInfo: 'Mayoreo (3+): $990.00 MXN',
-      stockText: 'Naucalpan: 65 cajas',
-      badge: 'RECOMPRA FRECUENTE',
-      badgeType: 'frequent',
-      quantity: 1,
-      category: 'Perfiles de Aluminio Modulares',
-      svgType: 'screws'
-    },
-    {
-      id: 'P6',
-      sku: 'SKU: PNE-IMP-12',
-      brand: 'Chicago Pneumatic',
-      name: 'Llave de Impacto Neumática 1/2" 1,350 Nm Ultra-Ligera',
-      price: 4890.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Garantía extendida 24 meses',
-      stockText: 'Naucalpan: 8 uds',
-      quantity: 1,
-      category: 'Herramientas Neumáticas',
-      svgType: 'wrench'
-    },
-    {
-      id: 'P7',
-      sku: 'SKU: ACT-FNE-3250',
-      brand: 'Festo System',
-      name: 'Actuador Cilindro Neumático ISO 32mm Carrera 50mm Doble Efecto',
-      price: 1630.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Incluye amortiguación neumática',
-      stockText: 'Naucalpan: 22 uds',
-      quantity: 2,
-      category: 'Herramientas Neumáticas',
-      svgType: 'cylinder'
-    },
-    {
-      id: 'P8',
-      sku: 'SKU: GNT-ANT-NVS',
-      brand: 'Ansell Safework',
-      name: 'Guante Anticorte Industrial Nivel F/5 Nitrilo Grip Talla L',
-      price: 165.00,
-      priceUnit: '/ pza',
-      bulkInfo: 'Pack x12 pares: $1,680.00 MXN',
-      stockText: 'Naucalpan: 110 pares',
-      quantity: 6,
-      category: 'Todos los Suministros',
-      svgType: 'gloves'
-    }
-  ];
+  products: ProductCatalogItem[] = [];
 
   get filteredProducts(): ProductCatalogItem[] {
     return this.products.filter(p => {
@@ -2395,17 +2283,21 @@ export class ClientsComponent implements OnInit {
     });
   }
 
-  // Mantenimiento de compatibilidad con backend de clientes
+  // Clientes traídos desde la base de datos
   clients: ClientItem[] = [];
   loading = false;
 
   ngOnInit(): void {
+    console.log('[Clientes] Solicitando clientes desde la base de datos...');
     this.http.get<ClientItem[]>('http://localhost:5235/api/Clients').subscribe({
       next: (data) => {
-        if (data) this.clients = data;
+        if (data) {
+          this.clients = data;
+          console.log('[Clientes] Clientes cargados desde BD:', data);
+        }
       },
-      error: () => {
-        // Modo offline / standalone
+      error: (err) => {
+        console.warn('[Clientes] Error o sin conexión con API de clientes:', err);
       }
     });
   }

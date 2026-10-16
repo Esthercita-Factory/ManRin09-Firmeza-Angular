@@ -1,8 +1,10 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
 import { EmployeeService, EmployeeDto, CreateEmployeeDto, UpdateEmployeeDto } from '../../Services/Employee.Service';
+import Swal from 'sweetalert2';
 
 interface RecentEmployee {
   id: string;
@@ -2081,6 +2083,7 @@ interface RecentEmployee {
 export class EmployeesComponent implements OnInit {
   private readonly employeeService = inject(EmployeeService);
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
 
   // Búsqueda por cédula (GET)
@@ -2220,11 +2223,13 @@ export class EmployeesComponent implements OnInit {
 
   employeesList: RecentEmployee[] = [];
 
-  constructor() {
-    this.fetchEmployeesFromApi();
-  }
+  constructor() {}
 
   ngOnInit(): void {
+    if (this.authService.isEmployee()) {
+      this.router.navigate(['/app/employee-dashboard']);
+      return;
+    }
     this.fetchEmployeesFromApi();
   }
 
@@ -2252,8 +2257,10 @@ export class EmployeesComponent implements OnInit {
   }
 
   fetchEmployeesFromApi(): void {
+    console.log('[Colaboradores] Obteniendo empleados desde la base de datos...');
     this.employeeService.getEmployees().subscribe({
       next: (data) => {
+        console.log('[Colaboradores] Registros obtenidos desde BD:', data);
         if (Array.isArray(data)) {
           const mapped: RecentEmployee[] = data.map(item => ({
             id: `EMP-${item.id}`,
@@ -2272,7 +2279,8 @@ export class EmployeesComponent implements OnInit {
         }
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
+        console.warn('[Colaboradores] Error consultando API de empleados:', err);
         this.cdr.detectChanges();
       }
     });
@@ -2364,14 +2372,35 @@ export class EmployeesComponent implements OnInit {
 
     if (!cleanName) {
       this.errorMessage = 'Por favor ingrese el nombre completo del empleado.';
+      Swal.fire({
+        position: 'top-end',
+        icon: 'warning',
+        title: this.errorMessage,
+        showConfirmButton: false,
+        timer: 2000
+      });
       return;
     }
     if (!cleanDoc) {
       this.errorMessage = 'Por favor ingrese el número de identificación del empleado.';
+      Swal.fire({
+        position: 'top-end',
+        icon: 'warning',
+        title: this.errorMessage,
+        showConfirmButton: false,
+        timer: 2000
+      });
       return;
     }
     if (!cleanRole) {
       this.errorMessage = 'Por favor escriba el rol o cargo asignado para el colaborador.';
+      Swal.fire({
+        position: 'top-end',
+        icon: 'warning',
+        title: this.errorMessage,
+        showConfirmButton: false,
+        timer: 2000
+      });
       return;
     }
 
@@ -2391,6 +2420,14 @@ export class EmployeesComponent implements OnInit {
         this.isLoading = false;
         this.activeEmployee = response; // Mostrar inmediatamente el nuevo empleado en el recuadro derecho
         this.successMessage = `Empleado "${response.fullName}" registrado con éxito en la base de datos.`;
+
+        Swal.fire({
+          position: 'top-end',
+          icon: 'success',
+          title: 'Empleado registrado exitosamente',
+          showConfirmButton: false,
+          timer: 1500
+        });
 
         const newEmp: RecentEmployee = {
           id: `EMP-${response.id || Math.floor(Math.random() * 900 + 100)}`,
@@ -2419,6 +2456,15 @@ export class EmployeesComponent implements OnInit {
         } else {
           this.errorMessage = 'Ocurrió un error al procesar el registro del empleado en la base de datos.';
         }
+
+        Swal.fire({
+          position: 'top-end',
+          icon: 'warning',
+          title: this.errorMessage,
+          showConfirmButton: false,
+          timer: 2000
+        });
+
         this.cdr.detectChanges();
       }
     });

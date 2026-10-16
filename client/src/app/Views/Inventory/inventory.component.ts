@@ -1,30 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-
-interface ProductItem {
-  id: string;
-  sku: string;
-  barcode: string;
-  name: string;
-  category: string;
-  categoryDetail: string;
-  hasRedDot?: boolean;
-  imageIcon: string;
-  location: string;
-  locationIcon?: 'pallet' | 'freeze' | 'lock' | 'standard';
-  stockTotal: string;
-  stockReserved: string;
-  stockAvailable: string;
-  isCriticalStock?: boolean;
-  stockLevelPercent: number;
-  stockStatus: 'ÓPTIMO' | 'STOCK CRÍTICO' | 'ESTABLE';
-  stockStatusClass: 'optimal' | 'critical' | 'stable';
-  costPrice: string;
-  salePrice: string;
-  lastMovement: string;
-  selected?: boolean;
-}
+import Swal from 'sweetalert2';
+import { ProductsService, ProductItem } from '../../Services/products.service';
 
 interface ReplenishmentItem {
   percent: number;
@@ -128,7 +106,7 @@ interface BatchExpiryItem {
             </div>
           </div>
           <div class="kpi-val-row">
-            <span class="kpi-big-val">24,850</span>
+            <span class="kpi-big-val">{{ products.length > 0 ? (products.length | number) : '24,850' }}</span>
             <span class="kpi-val-unit">SKUs</span>
           </div>
           <div class="kpi-footer-row">
@@ -308,6 +286,7 @@ interface BatchExpiryItem {
                 <th>NIVEL DE STOCK</th>
                 <th>COSTO / VENTA (USD)</th>
                 <th>ÚLTIMO MOV.</th>
+                <th style="text-align: center; width: 110px;">ACCIONES</th>
               </tr>
             </thead>
             <tbody>
@@ -346,8 +325,11 @@ interface BatchExpiryItem {
                 </td>
                 <td>
                   <div class="stock-cell">
-                    <span class="stock-main" [class.text-critical]="item.isCriticalStock">{{ item.stockTotal }}</span>
-                    <span class="stock-sub" [class.text-critical]="item.isCriticalStock">
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                      <span class="stock-main" [class.text-critical]="isUnderFive(item)">{{ item.stockTotal }}</span>
+                      <span *ngIf="isUnderFive(item)" class="badge-critical-tag">⚠️ &lt; 5 CRÍTICO</span>
+                    </div>
+                    <span class="stock-sub" [class.text-critical]="isUnderFive(item)">
                       {{ item.stockReserved }} resv. ({{ item.stockAvailable }} disp.)
                     </span>
                   </div>
@@ -355,13 +337,15 @@ interface BatchExpiryItem {
                 <td>
                   <div class="level-cell">
                     <div class="level-meta">
-                      <span class="level-status-text" [ngClass]="item.stockStatusClass">{{ item.stockStatus }}</span>
-                      <span class="level-percent">{{ item.stockLevelPercent }}%</span>
+                      <span class="level-status-text" [ngClass]="isUnderFive(item) ? 'critical' : item.stockStatusClass">
+                        {{ isUnderFive(item) ? 'STOCK CRÍTICO' : item.stockStatus }}
+                      </span>
+                      <span class="level-percent" [class.text-critical]="isUnderFive(item)">{{ item.stockLevelPercent }}%</span>
                     </div>
                     <div class="level-bar-track">
                       <div 
                         class="level-bar-fill" 
-                        [ngClass]="item.stockStatusClass"
+                        [ngClass]="isUnderFive(item) ? 'critical' : item.stockStatusClass"
                         [style.width.%]="item.stockLevelPercent">
                       </div>
                     </div>
@@ -376,6 +360,28 @@ interface BatchExpiryItem {
                 <td>
                   <span class="movement-cell">{{ item.lastMovement }}</span>
                 </td>
+                <td style="text-align: center;">
+                  <div class="action-buttons-group">
+                    <button class="btn-action-icon edit-btn" (click)="openEditProductModal(item)" title="Editar producto">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                      </svg>
+                    </button>
+                    <button class="btn-action-icon delete-btn" (click)="confirmDeleteProduct(item)" title="Eliminar producto">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="filteredProducts.length === 0">
+                <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                  No hay productos registrados en el inventario. Utilice "Nuevo Producto" para registrar datos.
+                </td>
               </tr>
             </tbody>
           </table>
@@ -383,7 +389,7 @@ interface BatchExpiryItem {
 
         <div class="table-footer">
           <div class="footer-left">
-            <span class="showing-text">Mostrando <strong>1 - {{ filteredProducts.length }}</strong> de <strong>24,850</strong> SKUs activos</span>
+            <span class="showing-text">Mostrando <strong>1 - {{ filteredProducts.length }}</strong> de <strong>{{ products.length > 0 ? (products.length | number) : '24,850' }}</strong> SKUs activos</span>
             <span class="sep-dot">•</span>
             <div class="rows-per-page">
               <span>Filas por pág:</span>
@@ -437,6 +443,9 @@ interface BatchExpiryItem {
           </div>
 
           <div class="reposition-items-list">
+            <div *ngIf="replenishmentQueue.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+              No hay ítems en la cola de reposición inmediata.
+            </div>
             <div *ngFor="let rep of replenishmentQueue" class="reposition-item">
               <div class="percent-badge" [ngClass]="rep.percentClass">
                 {{ rep.percent }}%
@@ -476,6 +485,9 @@ interface BatchExpiryItem {
           </div>
 
           <div class="expiry-items-list">
+            <div *ngIf="expiryBatches.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+              No hay lotes con fecha próxima de vencimiento registrados.
+            </div>
             <div *ngFor="let batch of expiryBatches" class="expiry-item">
               <div class="expiry-icon-col">
                 <svg *ngIf="batch.iconType === 'flask'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
@@ -1047,6 +1059,50 @@ interface BatchExpiryItem {
       font-family: 'JetBrains Mono', monospace;
     }
 
+    .badge-critical-tag {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      border-radius: 4px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.1rem 0.35rem;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .action-buttons-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      justify-content: center;
+    }
+
+    .btn-action-icon {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .btn-action-icon.edit-btn:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      transform: translateY(-1px);
+    }
+
+    .btn-action-icon.delete-btn:hover {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      transform: translateY(-1px);
+    }
+
     .table-footer {
       display: flex;
       justify-content: space-between;
@@ -1463,181 +1519,43 @@ interface BatchExpiryItem {
     }
   `]
 })
-export class InventoryComponent {
+export class InventoryComponent implements OnInit {
+  private readonly productsService = inject(ProductsService);
+
   searchQuery = '';
   selectedCategory = 'all';
   selectedLocation = 'all';
   selectedStockLevel = 'all';
   selectAll = false;
 
-  products: ProductItem[] = [
-    {
-      id: '1',
-      sku: 'SKU-7720-IPE',
-      barcode: '780992341201',
-      name: 'Viga de Acero Estructural IPE 200 (6m)',
-      category: 'Construcción y Perfiles',
-      categoryDetail: 'Acero A36',
-      imageIcon: '🏗️',
-      location: 'Nave A-P03-R2',
-      locationIcon: 'standard',
-      stockTotal: '420 Unid.',
-      stockReserved: '45',
-      stockAvailable: '375',
-      stockLevelPercent: 84,
-      stockStatus: 'ÓPTIMO',
-      stockStatusClass: 'optimal',
-      costPrice: '$142.50',
-      salePrice: '$189.00',
-      lastMovement: 'Hoy 08:30'
-    },
-    {
-      id: '2',
-      sku: 'SKU-3104-BOLT',
-      barcode: '780992348824',
-      name: 'Pernos de Anclaje Expansivo 3/4" x 7"',
-      category: 'Fijaciones',
-      categoryDetail: 'Grado 8 Galvanizado',
-      hasRedDot: true,
-      imageIcon: '🔩',
-      location: 'Nave C-P12-N4',
-      locationIcon: 'standard',
-      stockTotal: '24 Cajas',
-      stockReserved: '18',
-      stockAvailable: '6',
-      isCriticalStock: true,
-      stockLevelPercent: 12,
-      stockStatus: 'STOCK CRÍTICO',
-      stockStatusClass: 'critical',
-      costPrice: '$38.20',
-      salePrice: '$54.90',
-      lastMovement: 'Ayer 16:45'
-    },
-    {
-      id: '3',
-      sku: 'SKU-9901-CEM',
-      barcode: '780992319403',
-      name: 'Cemento Portland Especial Tipo IP (Saco 42.5kg)',
-      category: 'Construcción',
-      categoryDetail: 'Alta Resistencia Inicial',
-      imageIcon: '🧱',
-      location: 'Nave B-P01-Pallet',
-      locationIcon: 'pallet',
-      stockTotal: '1,850 Sacos',
-      stockReserved: '600',
-      stockAvailable: '1,250',
-      stockLevelPercent: 62,
-      stockStatus: 'ESTABLE',
-      stockStatusClass: 'stable',
-      costPrice: '$8.40',
-      salePrice: '$11.20',
-      lastMovement: 'Hoy 11:20'
-    },
-    {
-      id: '4',
-      sku: 'SKU-5542-POL',
-      barcode: '780992367710',
-      name: 'Sellador Poliuretano Industrial PU-50 Gris (600ml)',
-      category: 'Químicos y Selladores',
-      categoryDetail: 'Control Térmico',
-      imageIcon: '🧪',
-      location: 'Bahía Fría-BF02',
-      locationIcon: 'freeze',
-      stockTotal: '310 Cartuchos',
-      stockReserved: '40',
-      stockAvailable: '270',
-      stockLevelPercent: 78,
-      stockStatus: 'ÓPTIMO',
-      stockStatusClass: 'optimal',
-      costPrice: '$6.15',
-      salePrice: '$9.80',
-      lastMovement: '12 Sep 14:10'
-    },
-    {
-      id: '5',
-      sku: 'SKU-1890-DRL',
-      barcode: '780992350012',
-      name: 'Rotomartillo SDS-Plus Inalámbrico 20V Max',
-      category: 'Herramientas',
-      categoryDetail: 'Bahía Alta Seguridad',
-      imageIcon: '🛠️',
-      location: 'Nave C-Sec01-R1',
-      locationIcon: 'lock',
-      stockTotal: '54 Kits',
-      stockReserved: '12',
-      stockAvailable: '42',
-      stockLevelPercent: 54,
-      stockStatus: 'ÓPTIMO',
-      stockStatusClass: 'optimal',
-      costPrice: '$210.00',
-      salePrice: '$295.00',
-      lastMovement: '11 Sep 09:30'
-    }
-  ];
+  products: ProductItem[] = [];
+  replenishmentQueue: ReplenishmentItem[] = [];
+  expiryBatches: BatchExpiryItem[] = [];
 
-  replenishmentQueue: ReplenishmentItem[] = [
-    {
-      percent: 12,
-      percentClass: 'pink',
-      name: 'Pernos de Anclaje Expansivo 3/4" x 7" (SKU-3104-BOLT)',
-      sku: 'SKU-3104-BOLT',
-      statusNote: 'Stock disponible: 6 Cajas • Proveedor: FastenerTech Latam',
-      min: 50,
-      order: 100,
-      buttonText: 'Emitir PO',
-      buttonClass: 'blue-po'
-    },
-    {
-      percent: 0,
-      percentClass: 'red',
-      name: 'Disco de Corte Diamantado 9" Turbo Pro (SKU-8820-DC)',
-      sku: 'SKU-8820-DC',
-      statusNote: 'Agotado totalmente • 3 Pedidos de clientes retenidos',
-      isTotalStockout: true,
-      min: 25,
-      order: 80,
-      buttonText: 'Urgente',
-      buttonClass: 'red-urgent'
-    },
-    {
-      percent: 18,
-      percentClass: 'blue',
-      name: 'Guantes de Cuero Reforzado Descarne (SKU-4410-GLV)',
-      sku: 'SKU-4410-GLV',
-      statusNote: 'Stock disponible: 14 Pares • Proveedor: Seguridad Industrial Pro',
-      min: 60,
-      order: 150,
-      buttonText: 'Emitir PO',
-      buttonClass: 'blue-po'
-    }
-  ];
+  ngOnInit(): void {
+    this.loadProducts();
+  }
 
-  expiryBatches: BatchExpiryItem[] = [
-    {
-      iconType: 'flask',
-      name: 'Resina Epóxica de Anclaje',
-      daysRemaining: 14,
-      daysClass: 'red-days',
-      batchCode: '#EPX-882',
-      quantity: '45 Unid.'
-    },
-    {
-      iconType: 'paint',
-      name: 'Pintura Epóxica Alto Tráfico...',
-      daysRemaining: 28,
-      daysClass: 'normal-days',
-      batchCode: '#PNT-901',
-      quantity: '80 Galones'
-    },
-    {
-      iconType: 'chemistry',
-      name: 'Acelerante de Fraguado Sika...',
-      daysRemaining: 45,
-      daysClass: 'normal-days',
-      batchCode: '#SIK-104',
-      quantity: '120 Bidones'
-    }
-  ];
+  loadProducts(): void {
+    console.log('[Inventario] Cargando productos desde ProductsService / API...');
+    this.productsService.getProducts().subscribe({
+      next: (data) => {
+        this.products = data || [];
+      },
+      error: (err) => {
+        console.warn('[Inventario] Error cargando productos:', err);
+      }
+    });
+
+    this.productsService.products$.subscribe((items) => {
+      this.products = items || [];
+    });
+  }
+
+  isUnderFive(item: ProductItem): boolean {
+    const qty = parseInt(item.stockAvailable || item.stockTotal || '0', 10);
+    return isNaN(qty) ? false : (qty < 5 || item.stockStatusClass === 'critical' || item.stockStatus === 'STOCK CRÍTICO');
+  }
 
   get filteredProducts(): ProductItem[] {
     return this.products.filter(item => {
@@ -1658,32 +1576,240 @@ export class InventoryComponent {
     this.products.forEach(p => p.selected = this.selectAll);
   }
 
-  openNewProductModal(): void {
-    const sku = prompt('Ingrese SKU del nuevo producto (ej. SKU-5000-NEW):');
-    if (sku) {
-      const name = prompt('Nombre del producto:');
-      if (name) {
-        this.products.unshift({
-          id: `${Date.now()}`,
+  async openNewProductModal(): Promise<void> {
+    const { value: formValues } = await Swal.fire({
+      title: 'Registrar Nuevo Producto',
+      html: `
+        <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-family:inherit; padding:6px 0;">
+          <div>
+            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Código SKU *</label>
+            <input id="swal-sku" class="swal2-input" placeholder="Ej. SKU-5000-NEW" style="margin:0; width:100%; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Nombre del Producto *</label>
+            <input id="swal-name" class="swal2-input" placeholder="Ej. Viga de Acero IPN 200" style="margin:0; width:100%; box-sizing:border-box;">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Categoría</label>
+              <input id="swal-category" class="swal2-input" placeholder="Ej. Materiales" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Stock Inicial</label>
+              <input id="swal-stock" type="number" class="swal2-input" placeholder="100" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Registrar Producto',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#94a3b8',
+      preConfirm: () => {
+        const skuInput = document.getElementById('swal-sku') as HTMLInputElement;
+        const nameInput = document.getElementById('swal-name') as HTMLInputElement;
+        const categoryInput = document.getElementById('swal-category') as HTMLInputElement;
+        const stockInput = document.getElementById('swal-stock') as HTMLInputElement;
+
+        const sku = skuInput?.value?.trim();
+        const name = nameInput?.value?.trim();
+        const stockRaw = stockInput?.value?.trim() || '0';
+        const stockNum = parseInt(stockRaw, 10);
+
+        if (!sku) {
+          Swal.showValidationMessage('El código SKU es obligatorio.');
+          return false;
+        }
+        if (!name) {
+          Swal.showValidationMessage('El nombre del producto es obligatorio.');
+          return false;
+        }
+        // Validación obligatoria: Stock no puede ser negativo
+        if (isNaN(stockNum) || stockNum < 0) {
+          Swal.showValidationMessage('El stock de un producto no puede ser negativo.');
+          return false;
+        }
+
+        return {
           sku,
-          barcode: `${Math.floor(100000000000 + Math.random() * 900000000000)}`,
           name,
-          category: 'General',
-          categoryDetail: 'Nuevo Ingreso',
-          imageIcon: '📦',
-          location: 'Nave A-P01-R1',
-          stockTotal: '100 Unid.',
-          stockReserved: '0',
-          stockAvailable: '100',
-          stockLevelPercent: 100,
-          stockStatus: 'ÓPTIMO',
-          stockStatusClass: 'optimal',
-          costPrice: '$50.00',
-          salePrice: '$75.00',
-          lastMovement: 'Hoy recién'
-        });
-        alert(`Producto ${name} agregado al catálogo.`);
+          category: categoryInput?.value?.trim() || 'General',
+          stock: stockNum
+        };
       }
+    });
+
+    if (formValues) {
+      this.productsService.createProduct({
+        sku: formValues.sku,
+        name: formValues.name,
+        category: formValues.category,
+        stock: formValues.stock,
+        location: 'Nave A-P01-R1',
+        costPrice: '$50.00',
+        salePrice: '$75.00'
+      }).subscribe({
+        next: (created) => {
+          this.products = [created, ...this.products.filter(p => p.sku !== created.sku)];
+          Swal.fire({
+            position: 'top-end',
+            icon: 'success',
+            title: 'Producto registrado exitosamente',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        },
+        error: (err) => {
+          Swal.fire({
+            position: 'top-end',
+            icon: 'warning',
+            title: err?.error?.message || 'No se pudo completar el registro del producto',
+            showConfirmButton: false,
+            timer: 2000
+          });
+        }
+      });
+    }
+  }
+
+  async openEditProductModal(item: ProductItem): Promise<void> {
+    const currentStock = parseInt(item.stockAvailable || item.stockTotal || '0', 10) || 0;
+    const { value: formValues } = await Swal.fire({
+      title: `Editar Producto (${item.sku})`,
+      html: `
+        <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-family:inherit; padding:6px 0;">
+          <div>
+            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Nombre del Producto *</label>
+            <input id="swal-edit-name" class="swal2-input" value="${item.name}" style="margin:0; width:100%; box-sizing:border-box;">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Categoría</label>
+              <input id="swal-edit-category" class="swal2-input" value="${item.category}" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Stock Actual *</label>
+              <input id="swal-edit-stock" type="number" class="swal2-input" value="${currentStock}" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Ubicación Bodega</label>
+              <input id="swal-edit-location" class="swal2-input" value="${item.location}" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Precio Venta (USD)</label>
+              <input id="swal-edit-saleprice" class="swal2-input" value="${item.salePrice}" style="margin:0; width:100%; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar Cambios',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#94a3b8',
+      preConfirm: () => {
+        const nameInput = document.getElementById('swal-edit-name') as HTMLInputElement;
+        const categoryInput = document.getElementById('swal-edit-category') as HTMLInputElement;
+        const stockInput = document.getElementById('swal-edit-stock') as HTMLInputElement;
+        const locationInput = document.getElementById('swal-edit-location') as HTMLInputElement;
+        const salePriceInput = document.getElementById('swal-edit-saleprice') as HTMLInputElement;
+
+        const name = nameInput?.value?.trim();
+        const stockVal = parseInt(stockInput?.value?.trim() || '0', 10);
+
+        if (!name) {
+          Swal.showValidationMessage('El nombre del producto es obligatorio.');
+          return false;
+        }
+        // Validación obligatoria: Stock no puede ser negativo
+        if (isNaN(stockVal) || stockVal < 0) {
+          Swal.showValidationMessage('El stock de un producto no puede ser negativo.');
+          return false;
+        }
+
+        return {
+          name,
+          category: categoryInput?.value?.trim() || item.category,
+          stock: stockVal,
+          location: locationInput?.value?.trim() || item.location,
+          salePrice: salePriceInput?.value?.trim() || item.salePrice
+        };
+      }
+    });
+
+    if (formValues) {
+      this.productsService.updateProduct(item.id || item.sku, {
+        name: formValues.name,
+        category: formValues.category,
+        categoryDetail: item.categoryDetail,
+        stock: formValues.stock,
+        location: formValues.location,
+        costPrice: item.costPrice,
+        salePrice: formValues.salePrice,
+        imageIcon: item.imageIcon
+      }).subscribe({
+        next: (updated) => {
+          this.products = this.products.map(p => (p.id === item.id || p.sku === item.sku) ? updated : p);
+          Swal.fire({
+            position: 'top-end',
+            icon: 'success',
+            title: 'Producto actualizado exitosamente',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        },
+        error: (err) => {
+          Swal.fire({
+            position: 'top-end',
+            icon: 'warning',
+            title: err?.error?.message || 'No se pudo actualizar el producto',
+            showConfirmButton: false,
+            timer: 2000
+          });
+        }
+      });
+    }
+  }
+
+  async confirmDeleteProduct(item: ProductItem): Promise<void> {
+    const result = await Swal.fire({
+      title: '¿Eliminar producto?',
+      text: `¿Estás seguro de que deseas eliminar '${item.name}' (${item.sku})?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      this.productsService.deleteProduct(item.id || item.sku).subscribe({
+        next: () => {
+          this.products = this.products.filter(p => p.id !== item.id && p.sku !== item.sku);
+          Swal.fire({
+            position: 'top-end',
+            icon: 'success',
+            title: 'Producto eliminado exitosamente',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        },
+        error: (err) => {
+          Swal.fire({
+            position: 'top-end',
+            icon: 'warning',
+            title: err?.error?.message || 'No se pudo eliminar el producto',
+            showConfirmButton: false,
+            timer: 2000
+          });
+        }
+      });
     }
   }
 

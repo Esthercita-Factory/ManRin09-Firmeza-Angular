@@ -79,6 +79,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
+builder.Services.AddSingleton<IProductService, ProductService>();
 
 // Configuración de autenticación JWT (Esquema por defecto para API REST Angular)
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

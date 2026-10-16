@@ -535,6 +535,11 @@ interface CategoryValue {
                   </button>
                 </td>
               </tr>
+              <tr *ngIf="scheduledReports.length === 0">
+                <td colspan="6" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                  No hay reportes automatizados o programados generados en este momento.
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1526,59 +1531,12 @@ interface CategoryValue {
   `]
 })
 export class ReportsComponent {
-  categories: CategoryValue[] = [
-    { name: 'Materiales Pesados', percentage: 42, amount: '$1.24M', barColor: '#1d4ed8' },
-    { name: 'Sujeción y Tornillería', percentage: 28, amount: '$826K', barColor: '#2563eb' },
-    { name: 'Herramientas Especializadas', percentage: 18, amount: '$531K', barColor: '#60a5fa' },
-    { name: 'Químicos y Selladores', percentage: 12, amount: '$354K', barColor: '#93c5fd' }
-  ];
+  categories: CategoryValue[] = [];
+  scheduledReports: ScheduledReport[] = [];
 
-  scheduledReports: ScheduledReport[] = [
-    {
-      id: '1',
-      name: 'Auditoría Mensual de Mermas y Discrepancias',
-      code: 'RPT-2024-10-MERM',
-      format: 'XLSX',
-      formatColor: 'blue',
-      emission: 'Hoy, 08:00 AM',
-      size: '4.2 MB',
-      status: 'VIGENTE',
-      statusClass: 'active-status'
-    },
-    {
-      id: '2',
-      name: 'Informe de Productividad por Turno y Operador',
-      code: 'RPT-2024-10-PRO',
-      format: 'PDF',
-      formatColor: 'red',
-      emission: 'Ayer, 22:00 PM',
-      size: '1.8 MB',
-      status: 'VIGENTE',
-      statusClass: 'active-status'
-    },
-    {
-      id: '3',
-      name: 'Previsión de Demanda y Quiebre de Stock Q4',
-      code: 'RPT-2024-Q4-FORC',
-      format: 'CSV',
-      formatColor: 'gray',
-      emission: '28 Oct 2024',
-      size: '850 KB',
-      status: 'HISTÓRICO',
-      statusClass: 'historical-status'
-    },
-    {
-      id: '4',
-      name: 'Reporte de Rotación ABC de Almacén Central',
-      code: 'RPT-2024-10-ABC',
-      format: 'PDF',
-      formatColor: 'red',
-      emission: '25 Oct 2024',
-      size: '3.1 MB',
-      status: 'HISTÓRICO',
-      statusClass: 'historical-status'
-    }
-  ];
+  constructor() {
+    console.log('[Reportes] Inicializando vista de reportes sin datos quemados.');
+  }
 
   exportExecutiveReport(): void {
     alert('Generando Informe Ejecutivo Consolidado (PDF/Excel)... Descarga en curso.');

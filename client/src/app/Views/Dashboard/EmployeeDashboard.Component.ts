@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
+import { ProductsService, ProductItem } from '../../Services/products.service';
 
 interface AssignedTask {
   code: string;
@@ -37,160 +38,7 @@ interface ScheduledProvider {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="employee-layout">
-      <!-- 1. Barra Lateral de Navegación (Sidebar) -->
-      <aside class="employee-sidebar">
-        <!-- Logo Corporativo -->
-        <div class="sidebar-brand">
-          <div class="brand-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-              <path d="M2 17l10 5 10-5"></path>
-              <path d="M2 12l10 5 10-5"></path>
-            </svg>
-          </div>
-          <div class="brand-text">
-            <span class="brand-name">FIRMEZA</span>
-            <span class="brand-sub">INS ENTERPRISE</span>
-          </div>
-        </div>
-
-        <!-- Sección Operación Almacén -->
-        <div class="nav-section-title">OPERACIÓN ALMACÉN</div>
-
-        <nav class="sidebar-nav">
-          <a routerLink="/app/employee-dashboard" class="nav-item active">
-            <span class="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
-                <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
-                <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
-                <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
-              </svg>
-            </span>
-            <span class="nav-label">Panel Operativo</span>
-          </a>
-
-          <a routerLink="/app/inventory" class="nav-item">
-            <span class="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-            </span>
-            <span class="nav-label">Inventario y Productos</span>
-          </a>
-
-          <a routerLink="/app/enterprises" class="nav-item">
-            <span class="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m7 16-4-4 4-4"></path>
-                <path d="M3 12h18"></path>
-                <path d="m17 8 4 4-4 4"></path>
-              </svg>
-            </span>
-            <span class="nav-label">Movimientos y Pedidos</span>
-          </a>
-
-          <a routerLink="/app/clients" class="nav-item">
-            <span class="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="3" width="15" height="13"></rect>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                <circle cx="18.5" cy="18.5" r="2.5"></circle>
-              </svg>
-            </span>
-            <span class="nav-label">Proveedores</span>
-          </a>
-        </nav>
-
-        <!-- Footer del Sidebar: Estación Activa -->
-        <div class="sidebar-footer">
-          <div class="station-card">
-            <div class="station-header">
-              <span class="station-label">ESTACIÓN ACTIVA</span>
-              <span class="terminal-pill">
-                <span class="dot-online"></span>
-                TER-04
-              </span>
-            </div>
-            <div class="scanner-status-row">
-              <span class="scanner-text">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                  <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                  <line x1="7" y1="12" x2="17" y2="12"></line>
-                </svg>
-                Escáner Laser
-              </span>
-              <span class="scanner-badge-ok">V39-OK</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <!-- 2. Área de Contenido Principal -->
-      <main class="employee-main">
-        <!-- Barra Superior (Topbar) -->
-        <header class="employee-topbar">
-          <div class="topbar-left">
-            <!-- Badge de Almacén -->
-            <div class="badge-warehouse">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-              </svg>
-              <span>Almacén Central <span class="wh-tag">(WH-01)</span></span>
-            </div>
-
-            <!-- Badge de Escáner Online -->
-            <div class="badge-laser-online">
-              <span class="dot-pulse"></span>
-              <span>LASER SCANNER ONLINE</span>
-            </div>
-          </div>
-
-          <div class="topbar-right">
-            <!-- Botón de Notificaciones con punto rojo -->
-            <button class="topbar-icon-btn" title="Notificaciones de almacén">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span class="red-dot"></span>
-            </button>
-
-            <!-- Widget de Perfil del Empleado -->
-            <div class="employee-profile-widget" (click)="toggleUserMenu()">
-              <div class="profile-info">
-                <span class="profile-name">{{ employeeName }}</span>
-                <span class="profile-role">{{ employeeRole }}</span>
-              </div>
-              <div class="profile-avatar">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-            </div>
-
-            <!-- Botón de Cierre de Sesión -->
-            <button class="btn-logout" (click)="onLogout()" title="Cerrar Sesión">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-            </button>
-          </div>
-        </header>
-
-        <!-- Contenido Operativo Scrollable -->
-        <div class="employee-content-area">
+    <div class="employee-content-area">
           <!-- Banner de Bienvenida y Título -->
           <div class="title-banner">
             <div class="title-left">
@@ -483,9 +331,27 @@ interface ScheduledProvider {
                       </button>
                     </div>
 
+                    <!-- Mini lista de resultados interactivos en tiempo real -->
+                    <div *ngIf="products.length > 0" style="margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 120px; overflow-y: auto;">
+                      <div *ngFor="let p of filteredCatalogProducts.slice(0, 3)" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.72rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden;">
+                          <span>{{ p.imageIcon }}</span>
+                          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">
+                            <strong style="color: #0f172a; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;">{{ p.sku }}</strong>
+                            <div style="font-size: 0.64rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.name }}</div>
+                          </div>
+                        </div>
+                        <div style="text-align: right; white-space: nowrap;">
+                          <span [style.color]="isUnderFive(p) ? '#dc2626' : '#0284c7'" style="font-weight: 700; font-size: 0.7rem;">{{ p.stockAvailable }}</span>
+                          <div *ngIf="isUnderFive(p)" style="font-size: 0.6rem; color: #dc2626; font-weight: 700;">⚠️ &lt; 5</div>
+                          <div style="font-size: 0.62rem; color: #64748b;">{{ p.location }}</div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div class="tool-footer">
-                      <span class="tool-count">9,420 SKUs en catálogo</span>
-                      <span class="tool-tag-ok">WH-01 OK</span>
+                      <span class="tool-count">{{ products.length > 0 ? (products.length | number) : '5' }} SKUs en catálogo</span>
+                      <span class="tool-tag-ok">API OK</span>
                     </div>
                   </div>
 
@@ -556,6 +422,71 @@ interface ScheduledProvider {
                         <span>Registrar Conteo de Bin</span>
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Tabla Rápida de Productos para Operador -->
+                <div class="panel-card" style="margin-top: 1.25rem;">
+                  <div class="panel-header-row mb-3" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <h2 class="panel-title">Catálogo de Productos en Bahía</h2>
+                        <span class="live-status-pill" style="font-size: 0.65rem;">
+                          <span class="pulse-dot"></span>
+                          CONECTADO A /api/products
+                        </span>
+                      </div>
+                      <p class="panel-subtitle">Consulta de existencias y ubicación de productos asignados</p>
+                    </div>
+                    <a routerLink="/app/inventory" class="btn-tool-outline" style="text-decoration: none; font-size: 0.72rem; padding: 0.35rem 0.65rem;">
+                      <span>Ver Inventario Completo →</span>
+                    </a>
+                  </div>
+
+                  <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.74rem;">
+                      <thead>
+                        <tr style="border-bottom: 1px solid #e2e8f0; text-align: left; color: #64748b; font-size: 0.68rem; text-transform: uppercase;">
+                          <th style="padding: 0.5rem 0.65rem;">PRODUCTO / SKU</th>
+                          <th style="padding: 0.5rem 0.65rem;">UBICACIÓN</th>
+                          <th style="padding: 0.5rem 0.65rem;">STOCK TOTAL / DISP.</th>
+                          <th style="padding: 0.5rem 0.65rem;">ESTADO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let p of filteredCatalogProducts" style="border-bottom: 1px solid #f1f5f9;">
+                          <td style="padding: 0.55rem 0.65rem;">
+                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                              <span style="font-size: 1.15rem;">{{ p.imageIcon }}</span>
+                              <div>
+                                <strong style="color: #0f172a; display: block; font-size: 0.75rem;">{{ p.name }}</strong>
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #64748b;">{{ p.sku }} • {{ p.category }}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td style="padding: 0.55rem 0.65rem;">
+                            <span style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.15rem 0.45rem; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; color: #334155;">
+                              {{ p.location }}
+                            </span>
+                          </td>
+                          <td style="padding: 0.55rem 0.65rem;">
+                            <strong [style.color]="isUnderFive(p) ? '#dc2626' : '#0284c7'" style="font-family: 'JetBrains Mono', monospace;">{{ p.stockAvailable }}</strong>
+                            <span *ngIf="isUnderFive(p)" style="font-size: 0.62rem; color: #dc2626; font-weight: 700; margin-left: 3px;">⚠️ &lt; 5 CRÍTICO</span>
+                            <span style="color: #64748b; font-size: 0.68rem;"> (Tot: {{ p.stockTotal }})</span>
+                          </td>
+                          <td style="padding: 0.55rem 0.65rem;">
+                            <span [style.background]="isUnderFive(p) ? '#fee2e2' : '#e0f2fe'" [style.color]="isUnderFive(p) ? '#dc2626' : '#0284c7'" style="padding: 0.18rem 0.45rem; border-radius: 12px; font-size: 0.65rem; font-weight: 700;">
+                              {{ isUnderFive(p) ? 'STOCK CRÍTICO' : p.stockStatus }}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr *ngIf="filteredCatalogProducts.length === 0">
+                          <td colspan="4" style="text-align: center; padding: 1.5rem; color: #64748b;">
+                            No hay productos que coincidan con la búsqueda.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -644,15 +575,7 @@ interface ScheduledProvider {
                   </div>
                 </div>
 
-                <button class="btn-view-directory">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="1" y="3" width="15" height="13"></rect>
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                  </svg>
-                  <span>Ver Directorio de Proveedores</span>
-                </button>
+                
               </div>
 
               <!-- Bloque Terminal y Dispositivos -->
@@ -720,7 +643,6 @@ interface ScheduledProvider {
               </div>
             </div>
           </div>
-        </div>
 
         <!-- 5. Barra Inferior de Estado (Status Bar) -->
         <footer class="employee-statusbar">
@@ -736,7 +658,6 @@ interface ScheduledProvider {
             <span class="status-brand">FIRMEZA v4.12 Enterprise</span>
           </div>
         </footer>
-      </main>
     </div>
   `,
   styles: [`
@@ -2171,11 +2092,14 @@ interface ScheduledProvider {
 export class EmployeeDashboardComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly productsService = inject(ProductsService);
 
   employeeName = 'Carlos Mendoza';
   employeeRole = 'Operador Logístico';
   stockSearchInput = '';
   activeTab: 'all' | 'picking' | 'recepciones' = 'all';
+
+  products: ProductItem[] = [];
 
   // Datos visuales basados exactamente en el diseño de la imagen
   tasksList: AssignedTask[] = [
@@ -2242,6 +2166,39 @@ export class EmployeeDashboardComponent implements OnInit {
     if (user?.role && user.role !== 'User') {
       this.employeeRole = user.role === 'Employee' ? 'Operador Logístico' : user.role;
     }
+    this.loadProducts();
+  }
+
+  loadProducts(): void {
+    console.log('[EmployeeDashboard] Consultando productos a través de ProductsService...');
+    this.productsService.getProducts().subscribe({
+      next: (items) => {
+        this.products = items || [];
+      },
+      error: (err) => console.warn('[EmployeeDashboard] Error cargando productos:', err)
+    });
+
+    this.productsService.products$.subscribe((items) => {
+      this.products = items || [];
+    });
+  }
+
+  isUnderFive(p: ProductItem): boolean {
+    const qty = parseInt(p.stockAvailable || p.stockTotal || '0', 10);
+    return isNaN(qty) ? false : (qty < 5 || p.stockStatusClass === 'critical' || p.stockStatus === 'STOCK CRÍTICO');
+  }
+
+  get filteredCatalogProducts(): ProductItem[] {
+    if (!this.stockSearchInput.trim()) {
+      return this.products;
+    }
+    const term = this.stockSearchInput.toLowerCase();
+    return this.products.filter(p =>
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      p.barcode.includes(term) ||
+      p.location.toLowerCase().includes(term)
+    );
   }
 
   get filteredTasks(): AssignedTask[] {
