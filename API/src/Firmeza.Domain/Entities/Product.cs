@@ -93,5 +93,4 @@ public class Product
     public int StockTotal => Stock;
     public int StockAvailable => Math.Max(0, Stock - StockReserved);
     public string LastMovement { get; set; } = "Reciente";
-    public string ImageIcon { get; set; } = "📦";
 }

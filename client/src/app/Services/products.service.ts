@@ -8,6 +8,7 @@ export interface ProductItem {
   sku: string;
   barcode: string;
   name: string;
+  description?: string;
   category: string;
   categoryDetail: string;
   hasRedDot?: boolean;
@@ -24,29 +25,41 @@ export interface ProductItem {
   costPrice: string;
   salePrice: string;
   lastMovement: string;
+  minStock?: number;
+  registeredById?: string;
+  registeredByName?: string;
   selected?: boolean;
 }
 
 export interface CreateProductRequest {
   sku: string;
+  barcode?: string;
   name: string;
-  category?: string;
+  description?: string;
+  category: string;
   categoryDetail?: string;
   stock: number;
-  location?: string;
-  costPrice?: string;
-  salePrice?: string;
+  minStock?: number;
+  location: string;
+  costPrice: string | number;
+  salePrice: string | number;
+  price?: number;
   imageIcon?: string;
 }
 
 export interface UpdateProductRequest {
+  sku?: string;
+  barcode?: string;
   name: string;
-  category?: string;
+  description?: string;
+  category: string;
   categoryDetail?: string;
   stock: number;
-  location?: string;
-  costPrice?: string;
-  salePrice?: string;
+  minStock?: number;
+  location: string;
+  costPrice: string | number;
+  salePrice: string | number;
+  price?: number;
   imageIcon?: string;
 }
 
@@ -74,16 +87,32 @@ export class ProductsService {
     this.initRealtimeSync();
   }
 
+  private formatMoney(val: any, fallback: number = 0): string {
+    if (val === undefined || val === null || val === '') {
+      return `$${fallback.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    const num = typeof val === 'number'
+      ? val
+      : parseFloat(String(val).replace(/[^0-9.-]/g, ''));
+    if (isNaN(num)) {
+      return `$${fallback.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
   private normalizeProduct(raw: any): ProductItem {
     const rawStockStr = String(raw.stockAvailable ?? raw.stockTotal ?? raw.stock ?? '0');
     const stockVal = parseInt(rawStockStr.replace(/[^0-9-]/g, ''), 10) || 0;
     const isCrit = stockVal < 5;
+
+    const regName = raw.registeredByName || raw.registeredBy || 'Administrador';
 
     return {
       id: String(raw.id || raw.sku || ''),
       sku: String(raw.sku || ''),
       barcode: String(raw.barcode || ''),
       name: String(raw.name || ''),
+      description: String(raw.description || ''),
       category: String(raw.category || 'General'),
       categoryDetail: String(raw.categoryDetail || 'Inventario Firmeza'),
       hasRedDot: isCrit,
@@ -97,9 +126,12 @@ export class ProductsService {
       stockLevelPercent: typeof raw.stockLevelPercent === 'number' ? raw.stockLevelPercent : Math.min(100, Math.max(5, stockVal * 10)),
       stockStatus: isCrit ? 'STOCK CRÍTICO' : (raw.stockStatus || (stockVal <= 20 ? 'ESTABLE' : 'ÓPTIMO')),
       stockStatusClass: isCrit ? 'critical' : (raw.stockStatusClass || (stockVal <= 20 ? 'stable' : 'optimal')),
-      costPrice: String(raw.costPrice || '$10.00'),
-      salePrice: String(raw.salePrice || '$15.00'),
+      costPrice: this.formatMoney(raw.costPrice, 0),
+      salePrice: this.formatMoney(raw.price ?? raw.salePrice, 0),
       lastMovement: String(raw.lastMovement || 'Recién registrado'),
+      minStock: typeof raw.minStock === 'number' ? raw.minStock : 5,
+      registeredById: raw.registeredById ? String(raw.registeredById) : undefined,
+      registeredByName: String(regName),
       selected: !!raw.selected
     };
   }
@@ -113,7 +145,9 @@ export class ProductsService {
         a[i].stockTotal !== b[i].stockTotal ||
         a[i].stockAvailable !== b[i].stockAvailable ||
         a[i].name !== b[i].name ||
-        a[i].salePrice !== b[i].salePrice
+        a[i].costPrice !== b[i].costPrice ||
+        a[i].salePrice !== b[i].salePrice ||
+        a[i].registeredByName !== b[i].registeredByName
       ) {
         return true;
       }
@@ -211,7 +245,30 @@ export class ProductsService {
   }
 
   createProduct(request: CreateProductRequest): Observable<ProductItem> {
-    return this.http.post<any>(this.apiUrl, request, { headers: this.getAuthHeaders() }).pipe(
+    const costNum = typeof request.costPrice === 'number'
+      ? request.costPrice
+      : parseFloat(String(request.costPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const priceNum = typeof request.price === 'number'
+      ? request.price
+      : parseFloat(String(request.salePrice || request.price || '0').replace(/[^0-9.]/g, '')) || 0;
+
+    const payload = {
+      sku: request.sku,
+      barcode: request.barcode,
+      name: request.name,
+      description: request.description,
+      category: request.category,
+      categoryDetail: request.categoryDetail,
+      location: request.location,
+      costPrice: costNum,
+      price: priceNum,
+      salePrice: priceNum,
+      stock: request.stock,
+      stockReserved: 0,
+      minStock: request.minStock ?? 5
+    };
+
+    return this.http.post<any>(this.apiUrl, payload, { headers: this.getAuthHeaders() }).pipe(
       map(p => this.normalizeProduct(p)),
       tap((newProduct) => {
         const current = this.productsSubject.value;
@@ -222,7 +279,29 @@ export class ProductsService {
   }
 
   updateProduct(id: string, request: UpdateProductRequest): Observable<ProductItem> {
-    return this.http.put<any>(`${this.apiUrl}/${id}`, request, { headers: this.getAuthHeaders() }).pipe(
+    const costNum = typeof request.costPrice === 'number'
+      ? request.costPrice
+      : parseFloat(String(request.costPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const priceNum = typeof request.price === 'number'
+      ? request.price
+      : parseFloat(String(request.salePrice || request.price || '0').replace(/[^0-9.]/g, '')) || 0;
+
+    const payload = {
+      name: request.name,
+      description: request.description,
+      category: request.category,
+      categoryDetail: request.categoryDetail,
+      location: request.location,
+      costPrice: costNum,
+      price: priceNum,
+      salePrice: priceNum,
+      stock: request.stock,
+      stockReserved: 0,
+      minStock: request.minStock ?? 5,
+      isActive: true
+    };
+
+    return this.http.put<any>(`${this.apiUrl}/${id}`, payload, { headers: this.getAuthHeaders() }).pipe(
       map(p => this.normalizeProduct(p)),
       tap((updated) => {
         const current = this.productsSubject.value;

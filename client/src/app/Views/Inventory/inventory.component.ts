@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
+import { AuthService } from '../../Services/auth.service';
 import { ProductsService, ProductItem } from '../../Services/products.service';
 
 interface ReplenishmentItem {
@@ -94,9 +95,9 @@ interface BatchExpiryItem {
         </div>
       </header>
 
-      <!-- 2. Tarjetas de Métricas (4 KPIs) -->
-      <section class="kpi-grid">
-        <!-- KPI 1 -->
+      <!-- 2. Tarjetas de Métricas (KPIs) -->
+      <section class="kpi-grid" [class.employee-kpi-grid]="isEmployee">
+        <!-- KPI 1: Total SKUs Activos -->
         <div class="kpi-card">
           <div class="kpi-top-row">
             <span class="kpi-label">TOTAL SKUS ACTIVOS</span>
@@ -107,7 +108,7 @@ interface BatchExpiryItem {
             </div>
           </div>
           <div class="kpi-val-row">
-            <span class="kpi-big-val">{{ products.length > 0 ? (products.length | number) : '24,850' }}</span>
+            <span class="kpi-big-val">{{ totalActiveSkus | number }}</span>
             <span class="kpi-val-unit">SKUs</span>
           </div>
           <div class="kpi-footer-row">
@@ -116,14 +117,14 @@ interface BatchExpiryItem {
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
-              +320 este mes
+              {{ availableSkusCount }} con stock disponible
             </span>
-            <span class="stat-highlight">98.4% Disponibilidad</span>
+            <span class="stat-highlight">{{ availabilityPercent }}% Disponibilidad</span>
           </div>
         </div>
 
-        <!-- KPI 2 -->
-        <div class="kpi-card">
+        <!-- KPI 2: Valor Total en Bodega (Solo Administrador / Empresa) -->
+        <div class="kpi-card" *ngIf="!isEmployee">
           <div class="kpi-top-row">
             <span class="kpi-label">VALOR TOTAL EN BODEGA</span>
             <div class="kpi-icon-box blue-tint">
@@ -134,21 +135,20 @@ interface BatchExpiryItem {
             </div>
           </div>
           <div class="kpi-val-row">
-            <span class="kpi-big-val">$1,482,900</span>
-            <span class="kpi-val-unit">USD</span>
+            <span class="kpi-big-val">\${{ totalInventoryValue | number:'1.0-2' }}</span>
           </div>
           <div class="kpi-footer-row">
             <span class="rot-text">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
               </svg>
-              Rotación: 14 días
+              {{ totalUnitsInStock | number }} unidades totales
             </span>
-            <span class="trend-blue">+4.2% val. trim</span>
+            <span class="trend-blue">Valor inventario</span>
           </div>
         </div>
 
-        <!-- KPI 3 -->
+        <!-- KPI 3: Alertas de Stock Bajo -->
         <div class="kpi-card red-kpi">
           <div class="kpi-top-row">
             <span class="kpi-label red-lbl">ALERTAS DE STOCK BAJO</span>
@@ -161,34 +161,17 @@ interface BatchExpiryItem {
             </div>
           </div>
           <div class="kpi-val-row">
-            <span class="kpi-big-val red-num">18</span>
+            <span class="kpi-big-val red-num">{{ lowStockCount | number }}</span>
             <span class="kpi-val-unit red-unit">Críticos</span>
           </div>
           <div class="kpi-footer-row">
-            <span class="alert-urgent">
+            <span class="alert-urgent" *ngIf="lowStockCount > 0">
               <strong>!</strong> Requiere O/C urgente
             </span>
-            <span class="quiebre-text">4 en quiebre</span>
-          </div>
-        </div>
-
-        <!-- KPI 4 -->
-        <div class="kpi-card">
-          <div class="kpi-top-row">
-            <span class="kpi-label">OCUPACIÓN DE BAHÍAS</span>
-            <div class="kpi-icon-box teal-tint">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2">
-                <path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="kpi-val-row">
-            <span class="kpi-big-val">87.2%</span>
-            <span class="kpi-val-unit">Cap.</span>
-          </div>
-          <div class="kpi-footer-row">
-            <span class="naves-text">Naves A, B y C...</span>
-            <span class="racks-badge">2,140 / 2,450 Racks</span>
+            <span class="rot-text" *ngIf="lowStockCount === 0">
+              Stock en niveles óptimos
+            </span>
+            <span class="quiebre-text">{{ stockoutCount }} en quiebre</span>
           </div>
         </div>
       </section>
@@ -285,8 +268,8 @@ interface BatchExpiryItem {
                 <th>UBICACIÓN BODEGA</th>
                 <th>STOCK / RESERVADO</th>
                 <th>NIVEL DE STOCK</th>
-                <th>COSTO / VENTA (USD)</th>
-                <th>ÚLTIMO MOV.</th>
+                <th>COSTO / VENTA</th>
+                <th>REGISTRADO POR</th>
                 <th style="text-align: center; width: 110px;">ACCIONES</th>
               </tr>
             </thead>
@@ -359,7 +342,15 @@ interface BatchExpiryItem {
                   </div>
                 </td>
                 <td>
-                  <span class="movement-cell">{{ item.lastMovement }}</span>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #eff6ff; color: #2563eb; flex-shrink: 0;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </span>
+                    <span class="movement-cell" style="font-weight: 600; color: #1e293b;">{{ item.registeredByName || 'Administrador' }}</span>
+                  </div>
                 </td>
                 <td style="text-align: center;">
                   <div class="action-buttons-group">
@@ -390,7 +381,7 @@ interface BatchExpiryItem {
 
         <div class="table-footer">
           <div class="footer-left">
-            <span class="showing-text">Mostrando <strong>1 - {{ filteredProducts.length }}</strong> de <strong>{{ products.length > 0 ? (products.length | number) : '24,850' }}</strong> SKUs activos</span>
+            <span class="showing-text">Mostrando <strong>{{ filteredProducts.length > 0 ? '1 - ' + filteredProducts.length : '0' }}</strong> de <strong>{{ products.length | number }}</strong> SKUs activos</span>
             <span class="sep-dot">•</span>
             <div class="rows-per-page">
               <span>Filas por pág:</span>
@@ -546,8 +537,12 @@ interface BatchExpiryItem {
     /* 2. KPIs Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 1.15rem;
+    }
+
+    .kpi-grid.employee-kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
     }
 
     .kpi-card {
@@ -1521,6 +1516,7 @@ interface BatchExpiryItem {
   `]
 })
 export class InventoryComponent implements OnInit, OnDestroy {
+  private readonly authService = inject(AuthService);
   private readonly productsService = inject(ProductsService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly ngZone = inject(NgZone);
@@ -1536,6 +1532,52 @@ export class InventoryComponent implements OnInit, OnDestroy {
   products: ProductItem[] = [];
   replenishmentQueue: ReplenishmentItem[] = [];
   expiryBatches: BatchExpiryItem[] = [];
+
+  get isEmployee(): boolean {
+    return this.authService.isEmployee();
+  }
+
+  get totalActiveSkus(): number {
+    return this.products.length;
+  }
+
+  private getStockQuantity(item: ProductItem): number {
+    const raw = String(item.stockAvailable || item.stockTotal || '0').replace(/[^0-9-]/g, '');
+    const qty = parseInt(raw, 10);
+    return isNaN(qty) ? 0 : qty;
+  }
+
+  get lowStockCount(): number {
+    return this.products.filter(item => this.isUnderFive(item)).length;
+  }
+
+  get stockoutCount(): number {
+    return this.products.filter(item => this.getStockQuantity(item) <= 0).length;
+  }
+
+  get availableSkusCount(): number {
+    return this.products.filter(item => this.getStockQuantity(item) > 0).length;
+  }
+
+  get totalUnitsInStock(): number {
+    return this.products.reduce((acc, p) => acc + this.getStockQuantity(p), 0);
+  }
+
+  get totalInventoryValue(): number {
+    return this.products.reduce((acc, p) => {
+      const qty = this.getStockQuantity(p);
+      const rawPrice = String(p.costPrice || p.salePrice || '0').replace(/[^0-9.]/g, '');
+      const price = parseFloat(rawPrice) || 0;
+      return acc + (qty * price);
+    }, 0);
+  }
+
+  get availabilityPercent(): string {
+    if (this.products.length === 0) {
+      return '0';
+    }
+    return ((this.availableSkusCount / this.products.length) * 100).toFixed(1).replace(/\.0$/, '');
+  }
 
   ngOnInit(): void {
     this.loadProducts();
@@ -1573,8 +1615,8 @@ export class InventoryComponent implements OnInit, OnDestroy {
   }
 
   isUnderFive(item: ProductItem): boolean {
-    const qty = parseInt(item.stockAvailable || item.stockTotal || '0', 10);
-    return isNaN(qty) ? false : (qty < 5 || item.stockStatusClass === 'critical' || item.stockStatus === 'STOCK CRÍTICO');
+    const qty = this.getStockQuantity(item);
+    return qty < 5 || item.stockStatusClass === 'critical' || item.stockStatus === 'STOCK CRÍTICO';
   }
 
   get filteredProducts(): ProductItem[] {
@@ -1599,24 +1641,72 @@ export class InventoryComponent implements OnInit, OnDestroy {
   async openNewProductModal(): Promise<void> {
     const { value: formValues } = await Swal.fire({
       title: 'Registrar Nuevo Producto',
+      width: 640,
       html: `
-        <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-family:inherit; padding:6px 0;">
-          <div>
-            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Código SKU *</label>
-            <input id="swal-sku" class="swal2-input" placeholder="Ej. SKU-5000-NEW" style="margin:0; width:100%; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Nombre del Producto *</label>
-            <input id="swal-name" class="swal2-input" placeholder="Ej. Viga de Acero IPN 200" style="margin:0; width:100%; box-sizing:border-box;">
-          </div>
+        <div style="display:flex; flex-direction:column; gap:10px; text-align:left; font-family:inherit; max-height:70vh; overflow-y:auto; padding:4px 6px;">
+          <!-- SKU y Código de Barras -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Categoría</label>
-              <input id="swal-category" class="swal2-input" placeholder="Ej. Materiales" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Código SKU * (máx 30)</label>
+              <input id="swal-sku" class="swal2-input" maxlength="30" placeholder="Ej. SKU-7720-IPE" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Stock Inicial</label>
-              <input id="swal-stock" type="number" class="swal2-input" placeholder="100" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Código de Barras (máx 30)</label>
+              <input id="swal-barcode" class="swal2-input" maxlength="30" placeholder="Ej. 780992341201" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+          </div>
+
+          <!-- Nombre -->
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Nombre del Producto * (máx 80)</label>
+            <input id="swal-name" class="swal2-input" maxlength="80" placeholder="Ej. Viga de Acero IPN 200" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+          </div>
+
+          <!-- Descripción (Opcional, máx 500) -->
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Descripción (máx 500) - <span style="font-weight:400; color:#94a3b8;">Opcional</span></label>
+            <textarea id="swal-desc" class="swal2-textarea" maxlength="500" placeholder="Detalle técnico, dimensiones o especificaciones..." style="margin:0; width:100%; box-sizing:border-box; height:65px; font-size:0.82rem; font-family:inherit; resize:vertical;"></textarea>
+          </div>
+
+          <!-- Categoría y Detalle -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Categoría * (máx 40)</label>
+              <input id="swal-category" class="swal2-input" maxlength="40" placeholder="Ej. Construcción" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Detalle Categoría (máx 50)</label>
+              <input id="swal-catdetail" class="swal2-input" maxlength="50" placeholder="Ej. Acero Estructural A36" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+          </div>
+
+          <!-- Ubicación Bodega -->
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación en Bodega * (máx 30)</label>
+            <input id="swal-location" class="swal2-input" maxlength="30" placeholder="Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+          </div>
+
+          <!-- Precios: Costo y Venta -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Precio Costo *</label>
+              <input id="swal-cost" type="number" step="0.01" min="0" class="swal2-input" placeholder="50.00" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Precio Venta *</label>
+              <input id="swal-price" type="number" step="0.01" min="0" class="swal2-input" placeholder="75.00" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+          </div>
+
+          <!-- Stock Inicial y Stock Mínimo -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Stock Inicial *</label>
+              <input id="swal-stock" type="number" min="0" class="swal2-input" placeholder="100" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Stock Mínimo (Alerta)</label>
+              <input id="swal-minstock" type="number" min="0" class="swal2-input" value="5" placeholder="5" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
           </div>
         </div>
@@ -1628,35 +1718,100 @@ export class InventoryComponent implements OnInit, OnDestroy {
       confirmButtonColor: '#2563eb',
       cancelButtonColor: '#94a3b8',
       preConfirm: () => {
-        const skuInput = document.getElementById('swal-sku') as HTMLInputElement;
-        const nameInput = document.getElementById('swal-name') as HTMLInputElement;
-        const categoryInput = document.getElementById('swal-category') as HTMLInputElement;
-        const stockInput = document.getElementById('swal-stock') as HTMLInputElement;
-
-        const sku = skuInput?.value?.trim();
-        const name = nameInput?.value?.trim();
-        const stockRaw = stockInput?.value?.trim() || '0';
-        const stockNum = parseInt(stockRaw, 10);
+        const sku = (document.getElementById('swal-sku') as HTMLInputElement)?.value?.trim();
+        const barcode = (document.getElementById('swal-barcode') as HTMLInputElement)?.value?.trim();
+        const name = (document.getElementById('swal-name') as HTMLInputElement)?.value?.trim();
+        const desc = (document.getElementById('swal-desc') as HTMLTextAreaElement)?.value?.trim();
+        const category = (document.getElementById('swal-category') as HTMLInputElement)?.value?.trim();
+        const catDetail = (document.getElementById('swal-catdetail') as HTMLInputElement)?.value?.trim();
+        const location = (document.getElementById('swal-location') as HTMLInputElement)?.value?.trim();
+        const costStr = (document.getElementById('swal-cost') as HTMLInputElement)?.value?.trim();
+        const priceStr = (document.getElementById('swal-price') as HTMLInputElement)?.value?.trim();
+        const stockStr = (document.getElementById('swal-stock') as HTMLInputElement)?.value?.trim();
+        const minStockStr = (document.getElementById('swal-minstock') as HTMLInputElement)?.value?.trim();
 
         if (!sku) {
-          Swal.showValidationMessage('El código SKU es obligatorio.');
+          Swal.showValidationMessage('El código SKU es obligatorio (máx 30 caracteres).');
+          return false;
+        }
+        if (sku.length > 30) {
+          Swal.showValidationMessage('El código SKU no puede superar 30 caracteres.');
+          return false;
+        }
+        if (barcode && barcode.length > 30) {
+          Swal.showValidationMessage('El código de barras no puede superar 30 caracteres.');
           return false;
         }
         if (!name) {
-          Swal.showValidationMessage('El nombre del producto es obligatorio.');
+          Swal.showValidationMessage('El nombre del producto es obligatorio (máx 80 caracteres).');
           return false;
         }
-        // Validación obligatoria: Stock no puede ser negativo
+        if (name.length > 80) {
+          Swal.showValidationMessage('El nombre no puede superar 80 caracteres.');
+          return false;
+        }
+        if (desc && desc.length > 500) {
+          Swal.showValidationMessage('La descripción no puede superar 500 caracteres.');
+          return false;
+        }
+        if (!category) {
+          Swal.showValidationMessage('La categoría es obligatoria (máx 40 caracteres).');
+          return false;
+        }
+        if (category.length > 40) {
+          Swal.showValidationMessage('La categoría no puede superar 40 caracteres.');
+          return false;
+        }
+        if (catDetail && catDetail.length > 50) {
+          Swal.showValidationMessage('El detalle de categoría no puede superar 50 caracteres.');
+          return false;
+        }
+        if (!location) {
+          Swal.showValidationMessage('La ubicación en bodega es obligatoria (máx 30 caracteres).');
+          return false;
+        }
+        if (location.length > 30) {
+          Swal.showValidationMessage('La ubicación no puede superar 30 caracteres.');
+          return false;
+        }
+
+        const costNum = parseFloat(costStr || '0');
+        if (isNaN(costNum) || costNum < 0) {
+          Swal.showValidationMessage('El precio de costo no puede ser negativo.');
+          return false;
+        }
+
+        const priceNum = parseFloat(priceStr || '0');
+        if (isNaN(priceNum) || priceNum < 0) {
+          Swal.showValidationMessage('El precio de venta no puede ser negativo.');
+          return false;
+        }
+
+        const stockNum = parseInt(stockStr || '0', 10);
         if (isNaN(stockNum) || stockNum < 0) {
-          Swal.showValidationMessage('El stock de un producto no puede ser negativo.');
+          Swal.showValidationMessage('El stock inicial no puede ser negativo.');
+          return false;
+        }
+
+        const minStockNum = parseInt(minStockStr || '5', 10);
+        if (isNaN(minStockNum) || minStockNum < 0) {
+          Swal.showValidationMessage('El stock mínimo no puede ser negativo.');
           return false;
         }
 
         return {
           sku,
+          barcode: barcode || undefined,
           name,
-          category: categoryInput?.value?.trim() || 'General',
-          stock: stockNum
+          description: desc || undefined,
+          category,
+          categoryDetail: catDetail || 'General',
+          location,
+          costPrice: costNum,
+          salePrice: priceNum,
+          price: priceNum,
+          stock: stockNum,
+          minStock: minStockNum
         };
       }
     });
@@ -1664,12 +1819,17 @@ export class InventoryComponent implements OnInit, OnDestroy {
     if (formValues) {
       this.productsService.createProduct({
         sku: formValues.sku,
+        barcode: formValues.barcode,
         name: formValues.name,
+        description: formValues.description,
         category: formValues.category,
+        categoryDetail: formValues.categoryDetail,
         stock: formValues.stock,
-        location: 'Nave A-P01-R1',
-        costPrice: '$50.00',
-        salePrice: '$75.00'
+        minStock: formValues.minStock,
+        location: formValues.location,
+        costPrice: formValues.costPrice,
+        salePrice: formValues.salePrice,
+        price: formValues.price
       }).subscribe({
         next: (created) => {
           this.ngZone.run(() => {
@@ -1686,13 +1846,15 @@ export class InventoryComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.cdr.detectChanges();
-          Swal.fire({
-            position: 'top-end',
-            icon: 'warning',
-            title: err?.error?.message || 'No se pudo completar el registro del producto',
-            showConfirmButton: false,
-            timer: 2000
-          });
+          if (!err?.error?.handledByProductInterceptor) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Atención en Producto',
+              text: err?.error?.message || 'No se pudo completar el registro del producto',
+              confirmButtonText: 'Aceptar',
+              confirmButtonColor: '#2563eb'
+            });
+          }
         }
       });
     }
@@ -1700,32 +1862,66 @@ export class InventoryComponent implements OnInit, OnDestroy {
 
   async openEditProductModal(item: ProductItem): Promise<void> {
     const currentStock = parseInt(item.stockAvailable || item.stockTotal || '0', 10) || 0;
+    const currentCost = parseFloat(String(item.costPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const currentSale = parseFloat(String(item.salePrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const currentMinStock = item.minStock ?? 5;
+
     const { value: formValues } = await Swal.fire({
       title: `Editar Producto (${item.sku})`,
+      width: 640,
       html: `
-        <div style="display:flex; flex-direction:column; gap:12px; text-align:left; font-family:inherit; padding:6px 0;">
+        <div style="display:flex; flex-direction:column; gap:10px; text-align:left; font-family:inherit; max-height:70vh; overflow-y:auto; padding:4px 6px;">
+          <!-- Nombre -->
           <div>
-            <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Nombre del Producto *</label>
-            <input id="swal-edit-name" class="swal2-input" value="${item.name}" style="margin:0; width:100%; box-sizing:border-box;">
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Nombre del Producto * (máx 80)</label>
+            <input id="swal-edit-name" class="swal2-input" maxlength="80" value="${item.name}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
           </div>
+
+          <!-- Descripción (Opcional, máx 500) -->
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Descripción (máx 500) - <span style="font-weight:400; color:#94a3b8;">Opcional</span></label>
+            <textarea id="swal-edit-desc" class="swal2-textarea" maxlength="500" placeholder="Detalle técnico..." style="margin:0; width:100%; box-sizing:border-box; height:65px; font-size:0.82rem; font-family:inherit; resize:vertical;">${item.description || ''}</textarea>
+          </div>
+
+          <!-- Categoría y Detalle -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Categoría</label>
-              <input id="swal-edit-category" class="swal2-input" value="${item.category}" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Categoría * (máx 40)</label>
+              <input id="swal-edit-category" class="swal2-input" maxlength="40" value="${item.category}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Stock Actual *</label>
-              <input id="swal-edit-stock" type="number" class="swal2-input" value="${currentStock}" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Detalle Categoría (máx 50)</label>
+              <input id="swal-edit-catdetail" class="swal2-input" maxlength="50" value="${item.categoryDetail || ''}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
           </div>
+
+          <!-- Ubicación Bodega -->
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación Bodega * (máx 30)</label>
+            <input id="swal-edit-location" class="swal2-input" maxlength="30" value="${item.location}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+          </div>
+
+          <!-- Precios: Costo y Venta -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Ubicación Bodega</label>
-              <input id="swal-edit-location" class="swal2-input" value="${item.location}" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Precio Costo *</label>
+              <input id="swal-edit-cost" type="number" step="0.01" min="0" class="swal2-input" value="${currentCost}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
             <div>
-              <label style="font-size:0.82rem; font-weight:600; color:#475569; margin-bottom:4px; display:block;">Precio Venta (USD)</label>
-              <input id="swal-edit-saleprice" class="swal2-input" value="${item.salePrice}" style="margin:0; width:100%; box-sizing:border-box;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Precio Venta *</label>
+              <input id="swal-edit-price" type="number" step="0.01" min="0" class="swal2-input" value="${currentSale}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+          </div>
+
+          <!-- Stock Actual y Stock Mínimo -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Stock Actual *</label>
+              <input id="swal-edit-stock" type="number" min="0" class="swal2-input" value="${currentStock}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Stock Mínimo (Alerta)</label>
+              <input id="swal-edit-minstock" type="number" min="0" class="swal2-input" value="${currentMinStock}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
             </div>
           </div>
         </div>
@@ -1737,31 +1933,84 @@ export class InventoryComponent implements OnInit, OnDestroy {
       confirmButtonColor: '#2563eb',
       cancelButtonColor: '#94a3b8',
       preConfirm: () => {
-        const nameInput = document.getElementById('swal-edit-name') as HTMLInputElement;
-        const categoryInput = document.getElementById('swal-edit-category') as HTMLInputElement;
-        const stockInput = document.getElementById('swal-edit-stock') as HTMLInputElement;
-        const locationInput = document.getElementById('swal-edit-location') as HTMLInputElement;
-        const salePriceInput = document.getElementById('swal-edit-saleprice') as HTMLInputElement;
-
-        const name = nameInput?.value?.trim();
-        const stockVal = parseInt(stockInput?.value?.trim() || '0', 10);
+        const name = (document.getElementById('swal-edit-name') as HTMLInputElement)?.value?.trim();
+        const desc = (document.getElementById('swal-edit-desc') as HTMLTextAreaElement)?.value?.trim();
+        const category = (document.getElementById('swal-edit-category') as HTMLInputElement)?.value?.trim();
+        const catDetail = (document.getElementById('swal-edit-catdetail') as HTMLInputElement)?.value?.trim();
+        const location = (document.getElementById('swal-edit-location') as HTMLInputElement)?.value?.trim();
+        const costStr = (document.getElementById('swal-edit-cost') as HTMLInputElement)?.value?.trim();
+        const priceStr = (document.getElementById('swal-edit-price') as HTMLInputElement)?.value?.trim();
+        const stockStr = (document.getElementById('swal-edit-stock') as HTMLInputElement)?.value?.trim();
+        const minStockStr = (document.getElementById('swal-edit-minstock') as HTMLInputElement)?.value?.trim();
 
         if (!name) {
-          Swal.showValidationMessage('El nombre del producto es obligatorio.');
+          Swal.showValidationMessage('El nombre del producto es obligatorio (máx 80 caracteres).');
           return false;
         }
-        // Validación obligatoria: Stock no puede ser negativo
-        if (isNaN(stockVal) || stockVal < 0) {
-          Swal.showValidationMessage('El stock de un producto no puede ser negativo.');
+        if (name.length > 80) {
+          Swal.showValidationMessage('El nombre no puede superar 80 caracteres.');
+          return false;
+        }
+        if (desc && desc.length > 500) {
+          Swal.showValidationMessage('La descripción no puede superar 500 caracteres.');
+          return false;
+        }
+        if (!category) {
+          Swal.showValidationMessage('La categoría es obligatoria (máx 40 caracteres).');
+          return false;
+        }
+        if (category.length > 40) {
+          Swal.showValidationMessage('La categoría no puede superar 40 caracteres.');
+          return false;
+        }
+        if (catDetail && catDetail.length > 50) {
+          Swal.showValidationMessage('El detalle de categoría no puede superar 50 caracteres.');
+          return false;
+        }
+        if (!location) {
+          Swal.showValidationMessage('La ubicación en bodega es obligatoria (máx 30 caracteres).');
+          return false;
+        }
+        if (location.length > 30) {
+          Swal.showValidationMessage('La ubicación no puede superar 30 caracteres.');
+          return false;
+        }
+
+        const costNum = parseFloat(costStr || '0');
+        if (isNaN(costNum) || costNum < 0) {
+          Swal.showValidationMessage('El precio de costo no puede ser negativo.');
+          return false;
+        }
+
+        const priceNum = parseFloat(priceStr || '0');
+        if (isNaN(priceNum) || priceNum < 0) {
+          Swal.showValidationMessage('El precio de venta no puede ser negativo.');
+          return false;
+        }
+
+        const stockNum = parseInt(stockStr || '0', 10);
+        if (isNaN(stockNum) || stockNum < 0) {
+          Swal.showValidationMessage('El stock no puede ser negativo.');
+          return false;
+        }
+
+        const minStockNum = parseInt(minStockStr || '5', 10);
+        if (isNaN(minStockNum) || minStockNum < 0) {
+          Swal.showValidationMessage('El stock mínimo no puede ser negativo.');
           return false;
         }
 
         return {
           name,
-          category: categoryInput?.value?.trim() || item.category,
-          stock: stockVal,
-          location: locationInput?.value?.trim() || item.location,
-          salePrice: salePriceInput?.value?.trim() || item.salePrice
+          description: desc || undefined,
+          category,
+          categoryDetail: catDetail || item.categoryDetail,
+          location,
+          costPrice: costNum,
+          salePrice: priceNum,
+          price: priceNum,
+          stock: stockNum,
+          minStock: minStockNum
         };
       }
     });
@@ -1769,13 +2018,15 @@ export class InventoryComponent implements OnInit, OnDestroy {
     if (formValues) {
       this.productsService.updateProduct(item.id || item.sku, {
         name: formValues.name,
+        description: formValues.description,
         category: formValues.category,
-        categoryDetail: item.categoryDetail,
+        categoryDetail: formValues.categoryDetail,
         stock: formValues.stock,
+        minStock: formValues.minStock,
         location: formValues.location,
-        costPrice: item.costPrice,
+        costPrice: formValues.costPrice,
         salePrice: formValues.salePrice,
-        imageIcon: item.imageIcon
+        price: formValues.price
       }).subscribe({
         next: (updated) => {
           this.ngZone.run(() => {
@@ -1792,13 +2043,15 @@ export class InventoryComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.cdr.detectChanges();
-          Swal.fire({
-            position: 'top-end',
-            icon: 'warning',
-            title: err?.error?.message || 'No se pudo actualizar el producto',
-            showConfirmButton: false,
-            timer: 2000
-          });
+          if (!err?.error?.handledByProductInterceptor) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Atención en Producto',
+              text: err?.error?.message || 'No se pudo actualizar el producto',
+              confirmButtonText: 'Aceptar',
+              confirmButtonColor: '#2563eb'
+            });
+          }
         }
       });
     }

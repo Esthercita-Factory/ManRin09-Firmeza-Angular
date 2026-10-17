@@ -18,9 +18,43 @@ namespace Firmeza.Api.Controllers;
 [Route("api/[controller]")]
 public class ProductsController(
     UserManager<ApplicationUser> userManager,
+    IEmployeeRepository employeeRepository,
     IProductRepository productRepository) : ControllerBase
 {
-    private static ProductResponseDto MapToDto(Product p) => new(
+    private async Task<string> ResolveRegisteredByNameAsync(Product p, CancellationToken cancellationToken)
+    {
+        if (p.RegisteredById.HasValue)
+        {
+            var guidStr = p.RegisteredById.Value.ToString();
+            var user = await userManager.FindByIdAsync(guidStr);
+            if (user is not null)
+            {
+                return !string.IsNullOrWhiteSpace(user.FullName)
+                    ? user.FullName
+                    : (user.Email ?? "Administrador");
+            }
+
+            var bytes = p.RegisteredById.Value.ToByteArray();
+            var empId = BitConverter.ToInt32(bytes, 0);
+            if (empId > 0)
+            {
+                var emp = await employeeRepository.GetByIdAsync(empId, cancellationToken);
+                if (emp is not null && !string.IsNullOrWhiteSpace(emp.FullName))
+                {
+                    return emp.FullName;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(p.LastMovement) && p.LastMovement != "Reciente")
+        {
+            return p.LastMovement;
+        }
+
+        return "Administrador";
+    }
+
+    private static ProductResponseDto MapToDto(Product p, string registeredByName) => new(
         p.Id,
         p.Sku,
         p.Barcode,
@@ -36,6 +70,7 @@ public class ProductsController(
         p.MinStock,
         p.IsActive,
         p.RegisteredById,
+        registeredByName,
         p.EnterpriseId,
         p.CreatedAt,
         p.UpdatedAt
@@ -50,7 +85,14 @@ public class ProductsController(
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var products = await productRepository.GetAllAsync(cancellationToken);
-        var response = products.Select(MapToDto);
+        var response = new List<ProductResponseDto>();
+
+        foreach (var p in products)
+        {
+            var regName = await ResolveRegisteredByNameAsync(p, cancellationToken);
+            response.Add(MapToDto(p, regName));
+        }
+
         return Ok(response);
     }
 
@@ -69,11 +111,12 @@ public class ProductsController(
             return NotFound(new { message = $"No se encontró el producto con ID {id}." });
         }
 
-        return Ok(MapToDto(product));
+        var regName = await ResolveRegisteredByNameAsync(product, cancellationToken);
+        return Ok(MapToDto(product, regName));
     }
 
     /// <summary>
-    /// Registra un nuevo producto en el inventario identificando al usuario mediante su JWT.
+    /// Registra un nuevo producto en el inventario identificando al usuario o empleado mediante su JWT.
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(ProductResponseDto), StatusCodes.Status201Created)]
@@ -93,17 +136,41 @@ public class ProductsController(
             return Unauthorized(new { message = "No fue posible determinar la identidad del usuario a partir del token." });
         }
 
-        var user = await userManager.FindByEmailAsync(email);
-        if (user is null)
-        {
-            return Unauthorized(new { message = "El usuario asociado al token no existe en la base de datos." });
-        }
+        Guid registeredByGuid;
+        string registeredByName;
 
-        if (!Guid.TryParse(user.Id, out var registeredByGuid))
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is not null)
         {
-            registeredByGuid = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var subGuid)
-                ? subGuid
-                : Guid.NewGuid();
+            if (!Guid.TryParse(user.Id, out registeredByGuid))
+            {
+                registeredByGuid = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var subGuid)
+                    ? subGuid
+                    : Guid.NewGuid();
+            }
+
+            registeredByName = !string.IsNullOrWhiteSpace(user.FullName)
+                ? user.FullName
+                : (user.Email ?? "Administrador");
+        }
+        else
+        {
+            // Verificar si se trata de un Empleado autenticado ({documento}@firmeza.internal)
+            var docNumber = email.Split('@')[0];
+            var employee = await employeeRepository.GetByDocumentNumberAsync(docNumber, cancellationToken);
+
+            if (employee is null && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var empId))
+            {
+                employee = await employeeRepository.GetByIdAsync(empId, cancellationToken);
+            }
+
+            if (employee is null)
+            {
+                return Unauthorized(new { message = "El usuario asociado al token no existe en la base de datos." });
+            }
+
+            registeredByGuid = new Guid(employee.Id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            registeredByName = employee.FullName;
         }
 
         // Validamos si ya existe un producto con el mismo nombre
@@ -117,11 +184,11 @@ public class ProductsController(
         {
             Id = Guid.NewGuid(),
             Sku = string.IsNullOrWhiteSpace(request.Sku) ? $"SKU-{Random.Shared.Next(1000, 9999)}" : request.Sku,
-            Barcode = request.Barcode,
+            Barcode = request.Barcode ?? string.Empty,
             Name = request.Name,
-            Description = request.Description,
+            Description = request.Description ?? string.Empty,
             Category = string.IsNullOrWhiteSpace(request.Category) ? "General" : request.Category,
-            CategoryDetail = request.CategoryDetail,
+            CategoryDetail = request.CategoryDetail ?? string.Empty,
             Location = request.Location,
             CostPrice = request.CostPrice,
             Price = request.Price,
@@ -130,13 +197,14 @@ public class ProductsController(
             MinStock = request.MinStock,
             IsActive = true,
             RegisteredById = registeredByGuid,
+            LastMovement = registeredByName,
             EnterpriseId = request.EnterpriseId,
             CreatedAt = DateTime.UtcNow
         };
 
         await productRepository.AddAsync(product, cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { id = product.Id }, MapToDto(product));
+        return CreatedAtAction(nameof(GetById), new { id = product.Id }, MapToDto(product, registeredByName));
     }
 
     /// <summary>
@@ -159,11 +227,11 @@ public class ProductsController(
         }
 
         product.Sku = string.IsNullOrWhiteSpace(request.Sku) ? product.Sku : request.Sku;
-        product.Barcode = request.Barcode;
+        product.Barcode = request.Barcode ?? product.Barcode;
         product.Name = request.Name;
-        product.Description = request.Description;
+        product.Description = request.Description ?? string.Empty;
         product.Category = request.Category;
-        product.CategoryDetail = request.CategoryDetail;
+        product.CategoryDetail = request.CategoryDetail ?? string.Empty;
         product.Location = request.Location;
         product.CostPrice = request.CostPrice;
         product.Price = request.Price;
@@ -175,7 +243,8 @@ public class ProductsController(
 
         await productRepository.UpdateAsync(product, cancellationToken);
 
-        return Ok(MapToDto(product));
+        var regName = await ResolveRegisteredByNameAsync(product, cancellationToken);
+        return Ok(MapToDto(product, regName));
     }
 
     /// <summary>

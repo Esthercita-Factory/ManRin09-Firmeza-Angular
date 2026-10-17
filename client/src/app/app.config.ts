@@ -4,13 +4,14 @@ import { provideRouter } from '@angular/router';
 import { routes } from './router/app.routes';
 import { authInterceptor } from './Interceptors/auth.interceptor';
 import { employeeInterceptor } from './Interceptors/Employee.Interceptor';
+import { productInterceptor } from './Interceptors/Product.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([authInterceptor, employeeInterceptor]))
+    provideHttpClient(withInterceptors([authInterceptor, productInterceptor, employeeInterceptor]))
   ],
 };
 

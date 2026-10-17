@@ -80,34 +80,9 @@ interface ScheduledProvider {
             </div>
           </div>
 
-          <!-- 3. Métricas Clave Operativas (4 KPIs Grid) -->
-          <section class="kpis-grid">
-            <!-- KPI 1: Tareas de Picking -->
-            <div class="kpi-card">
-              <div class="kpi-header">
-                <span class="kpi-title">Tareas de Picking / Despacho Hoy</span>
-                <div class="kpi-icon-pill">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-metric-row">
-                <span class="kpi-big-num">24</span>
-                <span class="kpi-fraction">/ 32</span>
-                <span class="kpi-pill-percent">75%</span>
-              </div>
-              <div class="progress-bar-track">
-                <div class="progress-bar-fill" style="width: 75%;"></div>
-              </div>
-              <div class="kpi-footer-row">
-                <span class="kpi-foot-blue">+8 pendientes en cola</span>
-                <span class="kpi-foot-gray">Nave A-PB1</span>
-              </div>
-            </div>
-
-            <!-- KPI 2: Productos Consultados -->
+          <!-- 3. Métricas Clave Operativas (2 KPIs Grid) -->
+          <section class="kpis-grid kpis-grid-2">
+            <!-- KPI 1: Productos Consultados -->
             <div class="kpi-card">
               <div class="kpi-header">
                 <span class="kpi-title">Productos Consultados / Actualizados</span>
@@ -122,22 +97,22 @@ interface ScheduledProvider {
                 </div>
               </div>
               <div class="kpi-metric-row">
-                <span class="kpi-big-num">142</span>
+                <span class="kpi-big-num">{{ products.length | number }}</span>
                 <span class="kpi-unit">SKUs</span>
               </div>
-              <div class="kpi-subtext">Hoy en WH-01 (Auditoría Bahía A)</div>
+              <div class="kpi-subtext">Productos registrados en catálogo</div>
               <div class="kpi-footer-row mt-auto">
                 <span class="kpi-foot-flex">
                   <span class="dot-blue-sm"></span>
-                  Ritmo: ~18 lecturas / hora
+                  Datos en tiempo real desde /api/products
                 </span>
               </div>
             </div>
 
-            <!-- KPI 3: Movimientos en Tránsito -->
+            <!-- KPI 2: Movimientos -->
             <div class="kpi-card">
               <div class="kpi-header">
-                <span class="kpi-title">Movimientos y Pedidos en Tránsito</span>
+                <span class="kpi-title">Movimientos</span>
                 <div class="kpi-icon-pill">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
                     <path d="m7 16-4-4 4-4"></path>
@@ -147,46 +122,12 @@ interface ScheduledProvider {
                 </div>
               </div>
               <div class="kpi-metric-row">
-                <span class="kpi-big-num">18</span>
-                <span class="kpi-unit">Pedidos</span>
+                <span class="kpi-big-num">{{ totalMovements | number }}</span>
+                <span class="kpi-unit">Movimientos</span>
               </div>
               <div class="mini-stats-grid">
-                <div class="mini-stat-badge">6 recepciones</div>
-                <div class="mini-stat-badge">12 despachos listos</div>
-              </div>
-              <div class="kpi-footer-row">
-                <span class="kpi-foot-gray">Tiempo prom: 14 min</span>
-                <span class="kpi-foot-blue">Flujo Normal</span>
-              </div>
-            </div>
-
-            <!-- KPI 4: Proveedores Hoy -->
-            <div class="kpi-card">
-              <div class="kpi-header">
-                <span class="kpi-title">Proveedores con Entregas Hoy</span>
-                <div class="kpi-icon-pill">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                    <rect x="1" y="3" width="15" height="13"></rect>
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-metric-row">
-                <span class="kpi-big-num">4</span>
-                <span class="kpi-unit">Proveedores</span>
-              </div>
-              <div class="kpi-provider-pills">
-                <span class="kpi-foot-flex">
-                  <span class="dot-blue-sm"></span>
-                  2 en rampa descarga
-                </span>
-                <span class="kpi-foot-gray">2 programados</span>
-              </div>
-              <div class="kpi-footer-row">
-                <span class="kpi-foot-gray">Próximo arribo: 13:00 PM</span>
-                <span class="kpi-foot-blue fw-bold">Rampa 04</span>
+                <div class="mini-stat-badge">{{ productsIngresados | number }} productos ingresados</div>
+                <div class="mini-stat-badge">{{ productsDespachados | number }} productos despachados</div>
               </div>
             </div>
           </section>
@@ -1112,6 +1053,10 @@ interface ScheduledProvider {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 1rem;
+    }
+
+    .kpis-grid.kpis-grid-2 {
+      grid-template-columns: repeat(2, 1fr);
     }
 
     .kpi-card {
@@ -2105,6 +2050,15 @@ export class EmployeeDashboardComponent implements OnInit, OnDestroy {
   activeTab: 'all' | 'picking' | 'recepciones' = 'all';
 
   products: ProductItem[] = [];
+
+  // Movimientos reales: el backend aún no expone tabla/endpoint de movimientos,
+  // por lo que los contadores reflejan 0 hasta que exista esa fuente de datos.
+  productsIngresados = 0;
+  productsDespachados = 0;
+
+  get totalMovements(): number {
+    return this.productsIngresados + this.productsDespachados;
+  }
 
   // Datos visuales basados exactamente en el diseño de la imagen
   tasksList: AssignedTask[] = [

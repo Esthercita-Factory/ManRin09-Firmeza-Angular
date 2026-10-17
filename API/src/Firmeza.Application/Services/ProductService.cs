@@ -69,6 +69,7 @@ public class ProductService : IProductService
             Sku: cleanSku,
             Barcode: barcode,
             Name: request.Name.Trim(),
+            Description: request.Description?.Trim() ?? string.Empty,
             Category: string.IsNullOrWhiteSpace(request.Category) ? "General" : request.Category.Trim(),
             CategoryDetail: string.IsNullOrWhiteSpace(request.CategoryDetail) ? "Inventario Firmeza" : request.CategoryDetail.Trim(),
             Location: string.IsNullOrWhiteSpace(request.Location) ? "Nave A-P01-R1" : request.Location.Trim(),
@@ -78,10 +79,12 @@ public class ProductService : IProductService
             StockLevelPercent: percent,
             StockStatus: status,
             StockStatusClass: statusClass,
-            CostPrice: string.IsNullOrWhiteSpace(request.CostPrice) ? "$10.00" : request.CostPrice.Trim(),
-            SalePrice: string.IsNullOrWhiteSpace(request.SalePrice) ? "$15.00" : request.SalePrice.Trim(),
+            CostPrice: $"${request.CostPrice:F2}",
+            SalePrice: $"${request.Price:F2}",
             LastMovement: "Recién registrado",
-            ImageIcon: string.IsNullOrWhiteSpace(request.ImageIcon) ? "📦" : request.ImageIcon.Trim()
+            MinStock: request.MinStock,
+            RegisteredById: null,
+            EnterpriseId: request.EnterpriseId
         );
 
         _catalog[id] = product;
@@ -111,6 +114,7 @@ public class ProductService : IProductService
         var updated = existing with
         {
             Name = string.IsNullOrWhiteSpace(request.Name) ? existing.Name : request.Name.Trim(),
+            Description = request.Description is not null ? request.Description.Trim() : existing.Description,
             Category = string.IsNullOrWhiteSpace(request.Category) ? existing.Category : request.Category.Trim(),
             CategoryDetail = string.IsNullOrWhiteSpace(request.CategoryDetail) ? existing.CategoryDetail : request.CategoryDetail.Trim(),
             Location = string.IsNullOrWhiteSpace(request.Location) ? existing.Location : request.Location.Trim(),
@@ -119,10 +123,10 @@ public class ProductService : IProductService
             StockLevelPercent = percent,
             StockStatus = status,
             StockStatusClass = statusClass,
-            CostPrice = string.IsNullOrWhiteSpace(request.CostPrice) ? existing.CostPrice : request.CostPrice.Trim(),
-            SalePrice = string.IsNullOrWhiteSpace(request.SalePrice) ? existing.SalePrice : request.SalePrice.Trim(),
+            CostPrice = $"${request.CostPrice:F2}",
+            SalePrice = $"${request.Price:F2}",
             LastMovement = "Actualizado recientemente",
-            ImageIcon = string.IsNullOrWhiteSpace(request.ImageIcon) ? existing.ImageIcon : request.ImageIcon.Trim()
+            MinStock = request.MinStock
         };
 
         _catalog[existing.Id] = updated;
