@@ -12,6 +12,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleDetail> SaleDetails => Set<SaleDetail>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

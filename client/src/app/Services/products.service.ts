@@ -103,7 +103,8 @@ export class ProductsService {
   private normalizeProduct(raw: any): ProductItem {
     const rawStockStr = String(raw.stockAvailable ?? raw.stockTotal ?? raw.stock ?? '0');
     const stockVal = parseInt(rawStockStr.replace(/[^0-9-]/g, ''), 10) || 0;
-    const isCrit = stockVal < 5;
+    const minStockVal = typeof raw.minStock === 'number' ? raw.minStock : 5;
+    const isCrit = stockVal <= minStockVal || stockVal < 5;
 
     const regName = raw.registeredByName || raw.registeredBy || 'Administrador';
 
@@ -123,13 +124,15 @@ export class ProductsService {
       stockReserved: raw.stockReserved ? String(raw.stockReserved) : '0',
       stockAvailable: raw.stockAvailable ? String(raw.stockAvailable) : `${stockVal}`,
       isCriticalStock: isCrit,
-      stockLevelPercent: typeof raw.stockLevelPercent === 'number' ? raw.stockLevelPercent : Math.min(100, Math.max(5, stockVal * 10)),
-      stockStatus: isCrit ? 'STOCK CRÍTICO' : (raw.stockStatus || (stockVal <= 20 ? 'ESTABLE' : 'ÓPTIMO')),
-      stockStatusClass: isCrit ? 'critical' : (raw.stockStatusClass || (stockVal <= 20 ? 'stable' : 'optimal')),
+      stockLevelPercent: typeof raw.stockLevelPercent === 'number' 
+        ? raw.stockLevelPercent 
+        : (minStockVal > 0 ? Math.min(100, Math.round((stockVal / (minStockVal * 2)) * 100)) : Math.min(100, Math.max(5, stockVal * 10))),
+      stockStatus: stockVal <= 0 ? 'AGOTADO' : (isCrit ? 'STOCK CRÍTICO' : (stockVal <= minStockVal * 2 ? 'ESTABLE' : 'ÓPTIMO')),
+      stockStatusClass: stockVal <= 0 ? 'critical' : (isCrit ? 'critical' : (stockVal <= minStockVal * 2 ? 'stable' : 'optimal')),
       costPrice: this.formatMoney(raw.costPrice, 0),
       salePrice: this.formatMoney(raw.price ?? raw.salePrice, 0),
       lastMovement: String(raw.lastMovement || 'Recién registrado'),
-      minStock: typeof raw.minStock === 'number' ? raw.minStock : 5,
+      minStock: minStockVal,
       registeredById: raw.registeredById ? String(raw.registeredById) : undefined,
       registeredByName: String(regName),
       selected: !!raw.selected

@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { DashboardService } from '../../Services/dashboard.service';
 import { AuthService } from '../../Services/auth.service';
 import { ProductsService, ProductItem } from '../../Services/products.service';
+import { SaleService, SaleDto } from '../../Services/sale.service';
 
 interface Transaction {
   sku: string;
@@ -36,6 +37,20 @@ interface RestockItem {
   aisle: string;
 }
 
+interface ChartDayPoint {
+  label: string;
+  fullDate: string;
+  salesCount: number;
+  salesAmount: number;
+  ordersCount: number;
+  ordersAmount: number;
+  salesH: number;
+  salesY: number;
+  ordersH: number;
+  ordersY: number;
+  x: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -60,14 +75,35 @@ interface RestockItem {
               </span>
             </div>
             <div class="status-subtitle">
-              <span>Actualizado hace 2 minutos</span>
+              <span>Filtro activo: <strong>{{ selectedDay ? selectedDay : 'Todos los registros' }}</strong></span>
               <span class="sep-dot">•</span>
-              <span>Viernes, 25 de septiembre de 2026</span>
+              <span>{{ currentDateDisplay }}</span>
             </div>
           </div>
         </div>
 
         <div class="header-actions">
+          <!-- Selector de Fecha Específica para Dashboard -->
+          <div class="select-container" style="padding: 0.35rem 0.65rem;" title="Filtrar por fecha específica">
+            <svg class="pin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <input 
+              type="date" 
+              [(ngModel)]="selectedDay" 
+              (change)="onDateFilterChange()"
+              class="date-input-field"
+            />
+            <button 
+              *ngIf="selectedDay" 
+              (click)="selectedDay = ''; onDateFilterChange()" 
+              class="btn-clear-date" 
+              title="Ver todos los días">✕</button>
+          </div>
+
           <!-- Dropdown Selección de Almacén -->
           <div class="select-container">
             <svg class="pin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
@@ -106,7 +142,7 @@ interface RestockItem {
         </div>
       </header>
 
-      <!-- 2. Tarjetas de Métricas Clave (KPIs) -->
+      <!-- 2. Tarjetas de Métricas Clave (KPIs Independientes) -->
       <section class="kpis-grid">
         <!-- KPI 1: Valor Total Inventario -->
         <div class="kpi-card">
@@ -119,15 +155,10 @@ interface RestockItem {
               </svg>
             </div>
           </div>
-          <div class="kpi-big-value">$1,482,930</div>
+          <div class="kpi-big-value">\${{ totalInventoryValue | number:'1.0-2' }}</div>
           <div class="kpi-bottom-row">
-            <span class="kpi-pill green-pill">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="18 15 12 9 6 15"></polyline>
-              </svg>
-              +3.4%
-            </span>
-            <span class="kpi-caption">vs. mes anterior</span>
+            <span class="kpi-pill green-pill">{{ totalUnitsInStock | number }} uds</span>
+            <span class="kpi-caption">en base de datos</span>
           </div>
         </div>
 
@@ -145,12 +176,12 @@ interface RestockItem {
               </svg>
             </div>
           </div>
-          <div class="kpi-big-value">{{ products.length > 0 ? (products.length | number) : '8,420' }}</div>
+          <div class="kpi-big-value">{{ products.length | number }}</div>
           <div class="kpi-progress-row">
             <div class="progress-bar-track">
-              <div class="progress-bar-fill" style="width: 94%;"></div>
+              <div class="progress-bar-fill" [style.width.%]="availabilityPercent"></div>
             </div>
-            <span class="progress-label">94% Disponibles</span>
+            <span class="progress-label">{{ availabilityPercent }}% Disponibles</span>
           </div>
         </div>
 
@@ -167,35 +198,44 @@ interface RestockItem {
             </div>
           </div>
           <div class="kpi-big-value">
-            <span class="alert-red-number">14</span>
+            <span class="alert-red-number">{{ criticalStockCount }}</span>
             <span class="alert-suffix">items</span>
           </div>
           <div class="kpi-bottom-row">
-            <span class="kpi-pill red-pill">ACCIÓN PRIORITARIA</span>
-            <span class="kpi-caption">6 quiebres inminentes</span>
+            <span class="kpi-pill red-pill">{{ criticalStockCount > 0 ? 'ACCIÓN PRIORITARIA' : 'SIN ALERTAS' }}</span>
+            <span class="kpi-caption">{{ outOfStockCount }} quiebres inminentes</span>
           </div>
         </div>
 
-        <!-- KPI 4: Movimientos del Día -->
+        <!-- KPI 4: Movimientos / Órdenes (Lapso de Tiempo Independiente) -->
         <div class="kpi-card">
           <div class="kpi-top-row">
-            <span class="kpi-title">Movimientos del Día</span>
-            <div class="kpi-icon-container blue-tint">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="3" width="15" height="13"></rect>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                <circle cx="18.5" cy="18.5" r="2.5"></circle>
-              </svg>
+            <span class="kpi-title">Movimientos / Órdenes</span>
+            <div style="display: flex; align-items: center; gap: 0.3rem;">
+              <select [(ngModel)]="kpiOrdersLapse" class="kpi-lapse-select" title="Filtrar métrica por lapso">
+                <option value="day">Día Arriba</option>
+                <option value="today">Hoy</option>
+                <option value="7d">7 Días</option>
+                <option value="30d">30 Días</option>
+                <option value="all">Todo</option>
+              </select>
+              <div class="kpi-icon-container blue-tint">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="1" y="3" width="15" height="13"></rect>
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                </svg>
+              </div>
             </div>
           </div>
           <div class="kpi-big-value">
-            <span>158</span>
+            <span>{{ kpiSalesFiltered.length | number }}</span>
             <span class="order-suffix">órdenes</span>
           </div>
           <div class="kpi-bottom-row space-between">
-            <span class="delivery-rate">92% de cumplimiento diario</span>
-            <span class="kpi-pill green-pill">A TIEMPO</span>
+            <span class="delivery-rate">{{ kpiPaidOrdersPercent }}% ventas cobradas</span>
+            <span class="kpi-pill green-pill">{{ kpiPaidSalesCount }} VENDIDAS</span>
           </div>
         </div>
       </section>
@@ -257,27 +297,40 @@ interface RestockItem {
 
       <!-- 4. Sección Media: Gráfica Semanal y Reabastecimiento -->
       <section class="mid-section-grid">
-        <!-- Gráfica de Movimientos Semanales -->
+        <!-- Gráfica de Movimientos Semanales (Con filtro de tiempo independiente) -->
         <div class="weekly-chart-card">
           <div class="chart-header">
             <div>
-              <h2 class="chart-title">Flujo de Movimientos Semanales</h2>
-              <p class="chart-subtitle">Balance dinámico de entradas vs. despachos en Almacén Central</p>
+              <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <h2 class="chart-title">Flujo de Movimientos y Ventas</h2>
+                <!-- Lapso de tiempo independiente para la gráfica -->
+                <div class="chart-lapse-group">
+                  <button type="button" class="lapse-btn" [class.active]="chartLapse === '7d'" (click)="setChartLapse('7d')">7 Días</button>
+                  <button type="button" class="lapse-btn" [class.active]="chartLapse === '30d'" (click)="setChartLapse('30d')">30 Días</button>
+                  <button type="button" class="lapse-btn" [class.active]="chartLapse === 'custom'" (click)="setChartLapse('custom')">Lapso Libre</button>
+                </div>
+                <div *ngIf="chartLapse === 'custom'" style="display: flex; align-items: center; gap: 0.3rem;">
+                  <input type="date" [(ngModel)]="chartStartDate" class="date-chip-input" />
+                  <span style="font-size: 0.7rem; color: #64748b;">a</span>
+                  <input type="date" [(ngModel)]="chartEndDate" class="date-chip-input" />
+                </div>
+              </div>
+              <p class="chart-subtitle">Ventas realizadas (verde/azul) y pedidos pendientes (rojo) calculados desde la base de datos</p>
             </div>
             <div class="chart-legend-group">
               <div class="legend-item">
                 <span class="legend-box blue-box"></span>
-                <span>Entradas</span>
+                <span>Ventas Realizadas</span>
               </div>
               <div class="legend-item">
                 <span class="legend-box dark-navy-box"></span>
-                <span>Salidas / Envíos</span>
+                <span>Pedidos Pendientes</span>
               </div>
-              <span class="sem-tag">SEM 43</span>
+              <span class="sem-tag">{{ chartPoints.length }} DÍAS</span>
             </div>
           </div>
 
-          <!-- Gráfico SVG con barras duales y curva suavizada -->
+          <!-- Gráfico SVG con barras dinámicas reales -->
           <div class="chart-canvas-container">
             <svg viewBox="0 0 650 200" preserveAspectRatio="none" class="chart-svg">
               <defs>
@@ -293,67 +346,54 @@ interface RestockItem {
               <line x1="20" y1="125" x2="630" y2="125" stroke="#e2e8f0" stroke-dasharray="3,3" stroke-width="1"></line>
               <line x1="20" y1="170" x2="630" y2="170" stroke="#f1f5f9" stroke-width="1"></line>
 
-              <!-- Barras duales: Blue (#3b82f6) & Dark Navy (#1e293b) -->
-              <!-- LUN (x=50) -->
-              <rect x="42" y="75" width="13" height="95" rx="2" fill="#3b82f6"></rect>
-              <rect x="58" y="85" width="13" height="85" rx="2" fill="#1e293b"></rect>
+              <!-- Barras duales dinámicas de la base de datos -->
+              <g *ngFor="let pt of chartPoints">
+                <!-- Ventas (Azul/Verde) -->
+                <rect 
+                  [attr.x]="pt.x - 11" 
+                  [attr.y]="pt.salesY" 
+                  width="11" 
+                  [attr.height]="pt.salesH" 
+                  rx="2" 
+                  fill="#3b82f6">
+                  <title>{{ pt.fullDate }}: {{ pt.salesCount }} ventas completadas (\${{ pt.salesAmount | number:'1.0-2' }})</title>
+                </rect>
+                <!-- Pedidos Pendientes (Rojo/Oscuro) -->
+                <rect 
+                  [attr.x]="pt.x + 2" 
+                  [attr.y]="pt.ordersY" 
+                  width="11" 
+                  [attr.height]="pt.ordersH" 
+                  rx="2" 
+                  fill="#dc2626">
+                  <title>{{ pt.fullDate }}: {{ pt.ordersCount }} pedidos pendientes (\${{ pt.ordersAmount | number:'1.0-2' }})</title>
+                </rect>
+              </g>
 
-              <!-- MAR (x=135) -->
-              <rect x="127" y="62" width="13" height="108" rx="2" fill="#3b82f6"></rect>
-              <rect x="143" y="65" width="13" height="105" rx="2" fill="#1e293b"></rect>
-
-              <!-- MIÉ (x=220) -->
-              <rect x="212" y="45" width="13" height="125" rx="2" fill="#3b82f6"></rect>
-              <rect x="228" y="55" width="13" height="115" rx="2" fill="#1e293b"></rect>
-
-              <!-- JUE (x=305) -->
-              <rect x="297" y="58" width="13" height="112" rx="2" fill="#3b82f6"></rect>
-              <rect x="313" y="62" width="13" height="108" rx="2" fill="#1e293b"></rect>
-
-              <!-- VIE (x=390) -->
-              <rect x="382" y="40" width="13" height="130" rx="2" fill="#3b82f6"></rect>
-              <rect x="398" y="37" width="13" height="133" rx="2" fill="#1e293b"></rect>
-
-              <!-- SÁB (x=475) -->
-              <rect x="467" y="98" width="13" height="72" rx="2" fill="#3b82f6"></rect>
-              <rect x="483" y="105" width="13" height="65" rx="2" fill="#1e293b"></rect>
-
-              <!-- DOM (x=560) -->
-              <rect x="552" y="125" width="13" height="45" rx="2" fill="#3b82f6"></rect>
-              <rect x="568" y="128" width="13" height="42" rx="2" fill="#1e293b"></rect>
-
-              <!-- Área bajo la curva de tendencia suave -->
-              <path d="M 50 80 C 100 68, 170 50, 220 50 C 265 50, 345 52, 390 40 C 435 28, 450 85, 480 102 C 520 120, 540 126, 565 127 L 565 170 L 50 170 Z" fill="url(#areaGradient)"></path>
-
-              <!-- Curva de tendencia suavizada celeste/azul brillante -->
-              <path d="M 50 80 C 100 68, 170 50, 220 50 C 265 50, 345 52, 390 40 C 435 28, 450 85, 480 102 C 520 120, 540 126, 565 127" fill="none" stroke="#0284c7" stroke-width="2.6" stroke-linecap="round"></path>
+              <!-- Curva de tendencia suave -->
+              <path *ngIf="chartPoints.length > 1" [attr.d]="chartAreaPath" fill="url(#areaGradient)"></path>
+              <path *ngIf="chartPoints.length > 1" [attr.d]="chartLinePath" fill="none" stroke="#0284c7" stroke-width="2.6" stroke-linecap="round"></path>
             </svg>
 
-            <!-- Etiquetas de los días -->
+            <!-- Etiquetas dinámicas de los días en el eje X -->
             <div class="days-row">
-              <span class="day-label">LUN</span>
-              <span class="day-label">MAR</span>
-              <span class="day-label">MIÉ</span>
-              <span class="day-label">JUE</span>
-              <span class="day-label">VIE</span>
-              <span class="day-label">SÁB</span>
-              <span class="day-label">DOM</span>
+              <span class="day-label" *ngFor="let pt of chartPoints" [title]="pt.fullDate">{{ pt.label }}</span>
             </div>
           </div>
 
-          <!-- Métricas de pie de la gráfica -->
+          <!-- Métricas de pie de la gráfica calculadas dinámicamente -->
           <div class="chart-summary-bar">
             <div class="summary-col">
-              <span class="summary-label">TOTAL INGRESOS</span>
-              <span class="summary-val text-blue">1,248 uds</span>
+              <span class="summary-label">TOTAL VENTAS EN PERÍODO</span>
+              <span class="summary-val text-blue">\${{ chartTotalSalesAmount | number:'1.0-2' }} ({{ chartTotalSalesUnits }} ventas)</span>
             </div>
             <div class="summary-col">
-              <span class="summary-label">TOTAL DESPACHOS</span>
-              <span class="summary-val text-navy">1,312 uds</span>
+              <span class="summary-label">PEDIDOS PENDIENTES</span>
+              <span class="summary-val" style="color: #dc2626;">\${{ chartTotalOrdersAmount | number:'1.0-2' }} ({{ chartTotalOrdersUnits }} órdenes)</span>
             </div>
             <div class="summary-col">
-              <span class="summary-label">ROTACIÓN PROMEDIO</span>
-              <span class="summary-val text-green">4.8 días</span>
+              <span class="summary-label">TOTAL STOCK DISPONIBLE</span>
+              <span class="summary-val text-navy">{{ totalUnitsInStock | number }} uds</span>
             </div>
           </div>
         </div>
@@ -370,7 +410,7 @@ interface RestockItem {
                 </svg>
                 <h2 class="restock-title">Reabastecimiento</h2>
               </div>
-              <span class="critical-count-pill">3 CRÍTICOS</span>
+              <span class="critical-count-pill">{{ criticalStockCount }} CRÍTICOS</span>
             </div>
             <p class="restock-subtitle">Artículos que han sobrepasado su punto mínimo de reorden calculado por volumen.</p>
           </div>
@@ -404,7 +444,7 @@ interface RestockItem {
           </div>
 
           <div class="restock-footer">
-            <a routerLink="/app/dashboard" class="catalog-link">Ver catálogo completo de reorden →</a>
+            <a routerLink="/app/inventory" class="catalog-link">Ver catálogo completo en Inventario →</a>
           </div>
         </div>
       </section>
@@ -417,7 +457,7 @@ interface RestockItem {
               <h2 class="table-card-title">Catálogo y Control de Productos</h2>
               <span class="live-status-pill">
                 <span class="pulse-dot"></span>
-                ENDPOINT: /api/products
+                BD: {{ products.length }} ARTÍCULOS
               </span>
             </div>
             <p class="table-card-subtitle">Productos activos del almacén sincronizados en tiempo real mediante ProductsService</p>
@@ -453,61 +493,43 @@ interface RestockItem {
           <table class="inventory-table">
             <thead>
               <tr>
-                <th>SKU / CÓD. BARRAS</th>
-                <th>PRODUCTO Y CATEGORÍA</th>
-                <th>UBICACIÓN BODEGA</th>
-                <th>STOCK TOTAL / DISP.</th>
-                <th>ESTADO</th>
-                <th>PRECIO VENTA</th>
-                <th>ÚLTIMO MOV.</th>
+                <th>SKU</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Stock Disponible</th>
+                <th>Precio Costo</th>
+                <th>Precio Venta</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let prod of filteredProductsList; trackBy: trackBySku">
                 <td>
+                  <span class="location-badge">{{ prod.sku }}</span>
+                </td>
+                <td>
                   <div class="product-cell">
-                    <span class="product-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;">{{ prod.sku }}</span>
-                    <span class="product-sku-detail">{{ prod.barcode }}</span>
+                    <span class="product-title">{{ prod.name }}</span>
+                    <span class="product-sku-detail">{{ prod.location || 'Almacén Central' }}</span>
                   </div>
                 </td>
+                <td>{{ prod.category }}</td>
                 <td>
-                  <div class="product-cell" style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="font-size: 1.25rem;">{{ prod.imageIcon }}</span>
-                    <div>
-                      <span class="product-title">{{ prod.name }}</span>
-                      <span class="product-sku-detail">{{ prod.category }} • {{ prod.categoryDetail }}</span>
-                    </div>
-                  </div>
+                  <strong [class.qty-negative]="isUnderFive(prod)" [class.qty-positive]="!isUnderFive(prod)">
+                    {{ prod.stockAvailable || '0' }} uds
+                  </strong>
                 </td>
+                <td>\${{ prod.costPrice || '0.00' }}</td>
+                <td>\${{ prod.salePrice || '0.00' }}</td>
                 <td>
-                  <div class="location-cell">
-                    <span class="location-badge">{{ prod.location }}</span>
-                  </div>
-                </td>
-                <td>
-                  <span [class]="isUnderFive(prod) ? 'qty-negative' : 'qty-positive'">
-                    {{ prod.stockTotal }}
+                  <span [class]="'status-pill ' + (isUnderFive(prod) ? 'transit' : 'completed')">
+                    {{ isUnderFive(prod) ? 'Stock Bajo' : 'Normal' }}
                   </span>
-                  <div *ngIf="isUnderFive(prod)" style="font-size: 0.65rem; color: #dc2626; font-weight: 700;">⚠️ &lt; 5 CRÍTICO</div>
-                  <div style="font-size: 0.68rem; color: #64748b;">({{ prod.stockAvailable }} disp.)</div>
-                </td>
-                <td>
-                  <span [class]="'status-pill ' + (isUnderFive(prod) ? 'transit' : 'completed')" [style.background]="isUnderFive(prod) ? '#fee2e2' : ''" [style.color]="isUnderFive(prod) ? '#dc2626' : ''">
-                    {{ isUnderFive(prod) ? 'STOCK CRÍTICO' : prod.stockStatus }}
-                  </span>
-                </td>
-                <td>
-                  <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #0f172a;">
-                    {{ prod.salePrice }}
-                  </span>
-                </td>
-                <td>
-                  <span class="datetime-cell">{{ prod.lastMovement }}</span>
                 </td>
               </tr>
               <tr *ngIf="filteredProductsList.length === 0">
                 <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
-                  No se encontraron productos coincidentes en el almacén.
+                  No hay productos registrados en la base de datos.
                 </td>
               </tr>
             </tbody>
@@ -515,16 +537,30 @@ interface RestockItem {
         </div>
       </section>
 
-      <!-- 6. Tabla de Movimientos y Transacciones Recientes -->
+      <!-- 6. Tabla de Registro de Movimientos y Pedidos -->
       <section class="transactions-card">
         <div class="table-top-bar">
           <div>
-            <h2 class="table-card-title">Movimientos y Transacciones Recientes</h2>
-            <p class="table-card-subtitle">Registro cronológico de ingresos, despachos y transferencias entre ubicaciones</p>
+            <h2 class="table-card-title">Registro de Movimientos y Pedidos</h2>
+            <p class="table-card-subtitle">
+              Historial de pedidos y ventas registrado en base de datos.
+              <span *ngIf="selectedDay" style="color: #2563eb; font-weight: 600;"> (Filtrado por: {{ selectedDay }})</span>
+            </p>
           </div>
 
           <div class="table-controls">
-            <!-- Buscador interno -->
+            <!-- Pestañas de Filtrado -->
+            <div class="filter-tabs-container">
+              <button 
+                *ngFor="let tab of ['Todos', 'Ventas', 'Pedidos']" 
+                class="filter-tab-btn" 
+                [class.active]="activeTab === tab"
+                (click)="activeTab = tab">
+                {{ tab }}
+              </button>
+            </div>
+
+            <!-- Buscador -->
             <div class="table-search-box">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -533,86 +569,57 @@ interface RestockItem {
               <input 
                 type="text" 
                 [(ngModel)]="searchFilter" 
-                placeholder="Filtrar por SKU o lote..." 
+                placeholder="Filtrar por SKU, cliente o estado..." 
                 class="table-search-input"
               />
             </div>
 
-            <!-- Tabs de Filtro de Tipo -->
-            <div class="filter-tabs">
-              <button 
-                *ngFor="let tab of ['Todos', 'Entradas', 'Salidas', 'Traspasos']"
-                (click)="activeTab = tab"
-                [class.active]="activeTab === tab"
-                class="filter-tab-btn">
-                {{ tab }}
-              </button>
-            </div>
-
             <!-- Botón Refrescar -->
-            <button class="btn-table-refresh" (click)="refreshTransactions()" title="Recargar transacciones">
+            <button class="btn-table-refresh" (click)="refreshTransactions()" title="Refrescar datos">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
               </svg>
             </button>
           </div>
         </div>
 
-        <!-- Tabla de Datos -->
         <div class="table-wrapper">
           <table class="inventory-table">
             <thead>
               <tr>
-                <th>SKU / PRODUCTO</th>
-                <th>TIPO MOVIMIENTO</th>
-                <th>CANTIDAD</th>
-                <th>UBICACIÓN / BAHÍA</th>
-                <th>OPERADOR / RESP.</th>
-                <th>FECHA Y HORA</th>
-                <th>ESTADO</th>
+                <th>Detalle Transacción</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Ubicación</th>
+                <th>Responsable</th>
+                <th>Fecha y Hora</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let row of filteredTransactions">
-                <!-- Columna Producto y SKU -->
                 <td>
                   <div class="product-cell">
                     <span class="product-title">{{ row.product }}</span>
                     <span class="product-sku-detail">{{ row.detail }}</span>
                   </div>
                 </td>
-
-                <!-- Columna Tipo Movimiento -->
                 <td>
-                  <span [class]="'pill-type ' + row.type.toLowerCase()">
+                  <span [class]="'pill-type ' + (row.isPositive ? 'entrada' : 'salida')">
                     <span class="type-dot"></span>
-                    {{ row.type }}
+                    {{ row.isPositive ? 'VENTA' : 'PEDIDO' }}
                   </span>
                 </td>
-
-                <!-- Columna Cantidad -->
                 <td>
-                  <span [class]="row.isPositive ? 'qty-positive' : (row.isNeutral ? 'qty-neutral' : 'qty-negative')">
+                  <span [class]="row.isPositive ? 'qty-positive' : 'qty-negative'">
                     {{ row.quantity }}
                   </span>
                 </td>
-
-                <!-- Columna Ubicación -->
                 <td>
-                  <div class="location-cell">
-                    <span [class]="'location-badge ' + (row.locationHighlight ? 'location-highlight' : '')">
-                      {{ row.location }}
-                    </span>
-                    <ng-container *ngIf="row.toLocation">
-                      <span class="arrow-sep">→</span>
-                      <span class="location-badge">{{ row.toLocation }}</span>
-                    </ng-container>
-                  </div>
+                  <span class="location-badge">{{ row.location }}</span>
                 </td>
-
-                <!-- Columna Operador -->
                 <td>
                   <div class="operator-cell">
                     <div class="operator-avatar" [style.backgroundColor]="row.operatorBg" [style.color]="row.operatorColor">
@@ -621,78 +628,62 @@ interface RestockItem {
                     <span class="operator-name">{{ row.operator }}</span>
                   </div>
                 </td>
-
-                <!-- Columna Fecha y Hora -->
                 <td>
                   <span class="datetime-cell">{{ row.dateTime }}</span>
                 </td>
-
-                <!-- Columna Estado -->
                 <td>
-                  <span [class]="'status-pill ' + getStatusClass(row.status)">
-                    <svg *ngIf="row.status === 'Completado'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <span [class]="'status-pill ' + (row.isPositive ? 'completed' : 'verification')">
+                    <svg *ngIf="row.isPositive" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    <svg *ngIf="row.status === 'En Tránsito'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M5 22h14"></path>
-                      <path d="M5 2h14"></path>
-                      <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path>
-                      <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path>
-                    </svg>
-                    <svg *ngIf="row.status === 'En Verificación'" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg *ngIf="!row.isPositive" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                     {{ row.status }}
                   </span>
                 </td>
               </tr>
+              <tr *ngIf="filteredTransactions.length === 0">
+                <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                  No hay transacciones que coincidan con la fecha o filtros seleccionados (0 resultados).
+                </td>
+              </tr>
             </tbody>
           </table>
-        </div>
-
-        <!-- Paginación y Contador de Registros -->
-        <div class="table-pagination-footer">
-          <span class="pagination-count">Mostrando 1 - 5 de 158 transacciones hoy</span>
-          <div class="pagination-controls">
-            <button class="btn-pag-nav" disabled>&lt; Anterior</button>
-            <button class="btn-pag-num active">1</button>
-            <button class="btn-pag-num">2</button>
-            <button class="btn-pag-num">3</button>
-            <button class="btn-pag-nav">Siguiente &gt;</button>
-          </div>
         </div>
       </section>
     </div>
   `,
   styles: [`
-    :host {
-      display: block;
-      background-color: #f8fafc;
-      min-height: 100%;
+    .fz-viewport {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: #0f172a;
-      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      letter-spacing: -0.012em;
+      background-color: #f8fafc;
+      min-height: 100vh;
+      box-sizing: border-box;
     }
 
-    /* El contenedor de la vista usa .fz-viewport (styles.css) */
-
-    /* 1. Header */
     .header-banner {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 12px;
+      padding: 1.15rem 1.4rem;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
       flex-wrap: wrap;
-      gap: 1.25rem;
-      padding-bottom: 0.25rem;
+      gap: 1rem;
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.9rem;
     }
 
     .header-icon-badge {
@@ -700,33 +691,25 @@ interface RestockItem {
       height: 44px;
       border-radius: 10px;
       background: #eff6ff;
-      border: 1px solid #dbeafe;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
-    }
-
-    .header-titles {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
+      flex-shrink: 0;
     }
 
     .title-with-pill {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 0.75rem;
       flex-wrap: wrap;
     }
 
     .page-title {
-      font-size: 1.35rem;
-      font-weight: 800;
+      font-size: 1.18rem;
+      font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.03em;
       margin: 0;
-      line-height: 1.2;
+      letter-spacing: -0.02em;
     }
 
     .live-status-pill {
@@ -739,9 +722,7 @@ interface RestockItem {
       padding: 0.25rem 0.7rem;
       font-size: 0.64rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
       color: #475569;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
     .pulse-dot {
@@ -750,12 +731,6 @@ interface RestockItem {
       border-radius: 50%;
       background: #10b981;
       box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
-      animation: statusPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
-    }
-
-    @keyframes statusPulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.9); }
     }
 
     .status-subtitle {
@@ -764,6 +739,7 @@ interface RestockItem {
       gap: 0.45rem;
       font-size: 0.74rem;
       color: #64748b;
+      margin-top: 0.15rem;
     }
 
     .sep-dot {
@@ -778,7 +754,6 @@ interface RestockItem {
     }
 
     .select-container {
-      position: relative;
       display: flex;
       align-items: center;
       background: #ffffff;
@@ -786,13 +761,30 @@ interface RestockItem {
       border-radius: 8px;
       padding: 0.5rem 0.8rem;
       gap: 0.5rem;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-      transition: all 0.2s ease;
     }
 
-    .select-container:focus-within {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    .date-input-field {
+      border: none;
+      background: transparent;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #1e293b;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-clear-date {
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 0 0.15rem;
+    }
+
+    .btn-clear-date:hover {
+      color: #ef4444;
     }
 
     .warehouse-dropdown {
@@ -803,8 +795,6 @@ interface RestockItem {
       font-weight: 600;
       color: #1e293b;
       cursor: pointer;
-      appearance: none;
-      padding-right: 1.1rem;
       font-family: inherit;
     }
 
@@ -820,64 +810,24 @@ interface RestockItem {
       padding: 0.5rem 0.95rem;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-      font-family: inherit;
-    }
-
-    .btn-action-outline:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-      transform: translateY(-1px);
-    }
-
-    .btn-action-dark {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: #0f172a;
-      border: 1px solid #0f172a;
-      color: #ffffff;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 0.5rem 0.95rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
-      font-family: inherit;
-    }
-
-    .btn-action-dark:hover {
-      background: #1e293b;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
-      transform: translateY(-1px);
     }
 
     .btn-action-blue {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      border: 1px solid #1d4ed8;
+      background: #2563eb;
+      border: 1px solid #2563eb;
       color: #ffffff;
       font-size: 0.78rem;
       font-weight: 600;
-      padding: 0.5rem 1.05rem;
+      padding: 0.5rem 0.95rem;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
-      font-family: inherit;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
     }
 
-    .btn-action-blue:hover {
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.42);
-      transform: translateY(-1px);
-    }
-
-    /* 2. KPIs Grid con elevación de tarjetas y sombras multicapa */
+    /* KPIs Grid */
     .kpis-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -891,80 +841,54 @@ interface RestockItem {
       padding: 1.15rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 0.45rem;
-      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
-      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .kpi-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
-      border-color: rgba(203, 213, 225, 0.9);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
     .kpi-top-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
     }
 
     .kpi-title {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 600;
       color: #64748b;
-      letter-spacing: -0.01em;
+    }
+
+    .kpi-lapse-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      background: #f8fafc;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #334155;
+      padding: 0.15rem 0.35rem;
+      outline: none;
+      cursor: pointer;
     }
 
     .kpi-icon-container {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
-    .blue-tint {
-      background: #eff6ff;
-      border: 1px solid #dbeafe;
-    }
-
-    .teal-tint {
-      background: #e0f2fe;
-      border: 1px solid #bae6fd;
-    }
-
-    .red-tint {
-      background: #fee2e2;
-      border: 1px solid #fecaca;
-    }
-
-    .orange-tint {
-      background: #ffedd5;
-      border: 1px solid #fed7aa;
-    }
+    .blue-tint { background: #eff6ff; }
+    .teal-tint { background: #f0fdf4; }
+    .red-tint { background: #fee2e2; }
+    .orange-tint { background: #fff7ed; }
 
     .kpi-big-value {
-      font-size: 1.65rem;
+      font-size: 1.7rem;
       font-weight: 800;
       color: #0f172a;
-      letter-spacing: -0.04em;
-      line-height: 1.15;
-      display: flex;
-      align-items: baseline;
-      gap: 0.35rem;
-    }
-
-    .alert-red-number {
-      color: #dc2626;
-    }
-
-    .alert-suffix, .order-suffix {
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: #475569;
-      letter-spacing: 0;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
     }
 
     .kpi-bottom-row {
@@ -974,19 +898,15 @@ interface RestockItem {
       font-size: 0.73rem;
     }
 
-    .space-between {
+    .kpi-bottom-row.space-between {
       justify-content: space-between;
     }
 
     .kpi-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.18rem 0.5rem;
-      border-radius: 5px;
-      font-size: 0.68rem;
+      font-size: 0.66rem;
       font-weight: 700;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
     }
 
     .green-pill {
@@ -997,49 +917,35 @@ interface RestockItem {
     .red-pill {
       background: #fee2e2;
       color: #dc2626;
-      letter-spacing: 0.03em;
-    }
-
-    .kpi-caption {
-      color: #64748b;
-    }
-
-    .kpi-progress-row {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      margin-top: 0.15rem;
     }
 
     .progress-bar-track {
       flex: 1;
       height: 6px;
       background: #e2e8f0;
-      border-radius: 6px;
+      border-radius: 3px;
       overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
     .progress-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #3b82f6, #2563eb);
-      border-radius: 6px;
+      background: #0284c7;
+      border-radius: 3px;
     }
 
     .progress-label {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 600;
-      color: #334155;
-      white-space: nowrap;
+      color: #64748b;
     }
 
-    .delivery-rate {
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: #2563eb;
+    .kpi-progress-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
     }
 
-    /* 3. Accesos Rápidos con Sombras Interactivas */
+    /* Shortcuts Grid */
     .shortcuts-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -1055,15 +961,6 @@ interface RestockItem {
       align-items: center;
       gap: 1rem;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-    }
-
-    .shortcut-card:hover {
-      border-color: #cbd5e1;
-      background: #ffffff;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px -2px rgba(15, 23, 42, 0.08);
     }
 
     .shortcut-icon {
@@ -1074,7 +971,6 @@ interface RestockItem {
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
     }
 
     .shortcut-info {
@@ -1085,7 +981,6 @@ interface RestockItem {
       font-size: 0.84rem;
       font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.015em;
       margin: 0;
     }
 
@@ -1095,17 +990,7 @@ interface RestockItem {
       margin: 0.12rem 0 0;
     }
 
-    .shortcut-chevron {
-      color: #94a3b8;
-      transition: transform 0.2s ease, color 0.2s ease;
-    }
-
-    .shortcut-card:hover .shortcut-chevron {
-      color: #2563eb;
-      transform: translateX(3px);
-    }
-
-    /* 4. Sección Media (Gráfico + Reabastecimiento) */
+    /* Mid Section: Weekly Chart + Restock */
     .mid-section-grid {
       display: grid;
       grid-template-columns: 2.1fr 1fr;
@@ -1118,7 +1003,6 @@ interface RestockItem {
       border-radius: 12px;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
     }
 
     .chart-header {
@@ -1126,13 +1010,14 @@ interface RestockItem {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.8rem;
     }
 
     .chart-title {
       font-size: 0.95rem;
       font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.02em;
       margin: 0;
     }
 
@@ -1140,6 +1025,38 @@ interface RestockItem {
       font-size: 0.73rem;
       color: #64748b;
       margin: 0.2rem 0 0;
+    }
+
+    .chart-lapse-group {
+      display: inline-flex;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .lapse-btn {
+      border: none;
+      background: transparent;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    .lapse-btn.active {
+      background: #0f172a;
+      color: #ffffff;
+    }
+
+    .date-chip-input {
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.15rem 0.35rem;
+      font-size: 0.68rem;
+      outline: none;
+      font-family: inherit;
     }
 
     .chart-legend-group {
@@ -1152,161 +1069,148 @@ interface RestockItem {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      font-size: 0.73rem;
-      font-weight: 600;
-      color: #334155;
+      font-size: 0.72rem;
+      color: #64748b;
     }
 
     .legend-box {
       width: 10px;
       height: 10px;
-      border-radius: 3px;
+      border-radius: 2px;
     }
 
-    .blue-box {
-      background: #3b82f6;
-    }
-
-    .dark-navy-box {
-      background: #1e293b;
-    }
+    .blue-box { background: #3b82f6; }
+    .dark-navy-box { background: #dc2626; }
 
     .sem-tag {
-      background: #f1f5f9;
-      color: #64748b;
-      font-size: 0.66rem;
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 0.18rem 0.5rem;
-      border-radius: 5px;
-      border: 1px solid #e2e8f0;
+      color: #475569;
+      background: #f1f5f9;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
     }
 
     .chart-canvas-container {
-      padding: 0.75rem 1.4rem 0.85rem;
-      position: relative;
+      padding: 0.5rem 1.4rem 0.8rem;
+      display: flex;
+      flex-direction: column;
     }
 
     .chart-svg {
       width: 100%;
-      height: 175px;
+      height: 180px;
       overflow: visible;
     }
 
     .days-row {
       display: flex;
       justify-content: space-between;
-      padding: 0.5rem 2rem 0;
+      margin-top: 0.5rem;
+      padding: 0 0.5rem;
     }
 
     .day-label {
-      font-size: 0.69rem;
-      font-weight: 700;
-      color: #64748b;
-    }
-
-    .chart-summary-bar {
-      display: flex;
-      background: #f8fafc;
-      border-top: 1px solid #e2e8f0;
-      border-radius: 0 0 12px 12px;
-      padding: 0.85rem 1.4rem;
-    }
-
-    .summary-col {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.18rem;
-    }
-
-    .summary-col:not(:last-child) {
-      border-right: 1px solid #e2e8f0;
-    }
-
-    .summary-label {
-      font-size: 0.64rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
+      font-size: 0.68rem;
+      font-weight: 600;
       color: #64748b;
       text-transform: uppercase;
     }
 
+    .chart-summary-bar {
+      display: flex;
+      justify-content: space-around;
+      padding: 0.85rem 1.4rem;
+      border-top: 1px solid #f1f5f9;
+      background: #fafafc;
+      border-radius: 0 0 12px 12px;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .summary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .summary-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+
     .summary-val {
-      font-size: 0.92rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
+      font-size: 0.82rem;
+      font-weight: 700;
     }
 
-    .text-blue {
-      color: #2563eb;
-    }
+    .text-blue { color: #2563eb; }
+    .text-navy { color: #0f172a; }
 
-    .text-navy {
-      color: #1e293b;
-    }
-
-    .text-green {
-      color: #16a34a;
-    }
-
-    /* Reabastecimiento Card */
+    /* Restock Card */
     .restock-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
       border-radius: 12px;
-      padding: 1.25rem 1.3rem;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
+    }
+
+    .restock-header {
+      padding: 1.25rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
     }
 
     .restock-title-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.25rem;
     }
 
     .restock-title-group {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
     }
 
     .restock-title {
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.02em;
       margin: 0;
     }
 
     .critical-count-pill {
-      background: #fee2e2;
-      color: #dc2626;
-      font-size: 0.66rem;
+      font-size: 0.64rem;
       font-weight: 700;
-      padding: 0.18rem 0.5rem;
-      border-radius: 5px;
-      border: 1px solid #fecaca;
+      color: #dc2626;
+      background: #fee2e2;
+      padding: 0.18rem 0.45rem;
+      border-radius: 4px;
     }
 
     .restock-subtitle {
-      font-size: 0.7rem;
+      font-size: 0.71rem;
       color: #64748b;
-      margin: 0.4rem 0 0.85rem;
-      line-height: 1.35;
+      margin: 0;
     }
 
     .restock-items-list {
+      flex: 1;
+      padding: 0.5rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.8rem;
+      overflow-y: auto;
+      max-height: 280px;
     }
 
     .restock-item {
-      padding: 0.6rem 0;
-      border-top: 1px solid #f1f5f9;
+      padding: 0.65rem;
+      border: 1px solid #f1f5f9;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
       gap: 0.3rem;
@@ -1314,120 +1218,85 @@ interface RestockItem {
 
     .item-title-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
     }
 
     .item-name {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.01em;
     }
 
     .badge-critical {
+      font-size: 0.6rem;
+      font-weight: 700;
       background: #fee2e2;
       color: #dc2626;
-      font-size: 0.63rem;
-      font-weight: 700;
-      padding: 0.12rem 0.45rem;
-      border-radius: 4px;
-      border: 1px solid #fecaca;
+      padding: 0.12rem 0.4rem;
+      border-radius: 3px;
     }
 
     .badge-low {
-      background: #fef3c7;
-      color: #b45309;
-      font-size: 0.63rem;
+      font-size: 0.6rem;
       font-weight: 700;
-      padding: 0.12rem 0.45rem;
-      border-radius: 4px;
-      border: 1px solid #fde68a;
+      background: #fef3c7;
+      color: #d97706;
+      padding: 0.12rem 0.4rem;
+      border-radius: 3px;
     }
 
     .item-sku {
-      font-size: 0.69rem;
+      font-size: 0.67rem;
       color: #64748b;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: monospace;
     }
 
     .item-stats-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 0.73rem;
+      font-size: 0.7rem;
       color: #475569;
     }
 
-    .text-red {
-      color: #dc2626;
-      font-weight: 700;
-    }
-
-    .text-amber {
-      color: #b45309;
-      font-weight: 700;
-    }
-
-    .aisle-info {
-      font-size: 0.71rem;
-      color: #64748b;
-    }
-
     .btn-solicitar {
-      margin-top: 0.4rem;
-      display: flex;
+      margin-top: 0.3rem;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      gap: 0.35rem;
       background: #ffffff;
       border: 1px solid #cbd5e1;
-      color: #2563eb;
-      font-size: 0.74rem;
+      border-radius: 5px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.7rem;
       font-weight: 600;
-      padding: 0.45rem;
-      border-radius: 6px;
+      color: #2563eb;
       cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      font-family: inherit;
-    }
-
-    .btn-solicitar:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
-      transform: translateY(-1px);
     }
 
     .restock-footer {
-      margin-top: auto;
-      padding-top: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid #f1f5f9;
       text-align: center;
     }
 
     .catalog-link {
-      font-size: 0.77rem;
+      font-size: 0.74rem;
       font-weight: 600;
       color: #2563eb;
       text-decoration: none;
-      transition: color 0.15s ease;
     }
 
-    .catalog-link:hover {
-      color: #1d4ed8;
-      text-decoration: underline;
-    }
-
-    /* 5. Tabla de Transacciones Recientes */
+    /* Transactions & Products Table */
     .transactions-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
       border-radius: 12px;
-      padding: 1.25rem 1.4rem 1rem;
+      padding: 1.25rem;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 1px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.04);
+      gap: 0.9rem;
     }
 
     .table-top-bar {
@@ -1436,85 +1305,43 @@ interface RestockItem {
       align-items: center;
       flex-wrap: wrap;
       gap: 0.85rem;
-      margin-bottom: 1rem;
     }
 
     .table-card-title {
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: 700;
       color: #0f172a;
-      letter-spacing: -0.02em;
       margin: 0;
     }
 
     .table-card-subtitle {
       font-size: 0.73rem;
       color: #64748b;
-      margin: 0.2rem 0 0;
+      margin: 0.15rem 0 0;
     }
 
     .table-controls {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.6rem;
       flex-wrap: wrap;
     }
 
-    .table-search-box {
-      display: flex;
-      align-items: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0.4rem 0.75rem;
-      gap: 0.45rem;
-      width: 220px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      transition: all 0.2s ease;
-    }
-
-    .table-search-box:focus-within {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-
-    .table-search-input {
-      border: none;
-      background: transparent;
-      outline: none;
-      font-size: 0.76rem;
-      color: #0f172a;
-      width: 100%;
-      font-family: inherit;
-    }
-
-    .table-search-input::placeholder {
-      color: #94a3b8;
-    }
-
-    .filter-tabs {
+    .filter-tabs-container {
       display: flex;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
       overflow: hidden;
-      background: #ffffff;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
     .filter-tab-btn {
       border: none;
       background: transparent;
-      padding: 0.42rem 0.85rem;
-      font-size: 0.74rem;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.73rem;
       font-weight: 500;
       color: #64748b;
       cursor: pointer;
-      transition: all 0.15s ease;
-      font-family: inherit;
-    }
-
-    .filter-tab-btn:not(:last-child) {
-      border-right: 1px solid #e2e8f0;
     }
 
     .filter-tab-btn.active {
@@ -1523,25 +1350,32 @@ interface RestockItem {
       font-weight: 600;
     }
 
+    .table-search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0.35rem 0.65rem;
+    }
+
+    .table-search-input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 0.75rem;
+      font-family: inherit;
+      width: 170px;
+    }
+
     .btn-table-refresh {
       background: #ffffff;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
-      padding: 0.42rem 0.55rem;
+      padding: 0.4rem 0.55rem;
       color: #64748b;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    }
-
-    .btn-table-refresh:hover {
-      background: #f8fafc;
-      color: #0f172a;
-      border-color: #94a3b8;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-      transform: translateY(-1px);
     }
 
     .table-wrapper {
@@ -1570,11 +1404,6 @@ interface RestockItem {
       padding: 0.85rem 0.95rem;
       border-bottom: 1px solid #f1f5f9;
       vertical-align: middle;
-      transition: background-color 0.15s ease;
-    }
-
-    .inventory-table tbody tr:hover td {
-      background-color: #f8fafc;
     }
 
     .product-cell {
@@ -1586,14 +1415,13 @@ interface RestockItem {
       font-weight: 700;
       color: #0f172a;
       font-size: 0.8rem;
-      letter-spacing: -0.01em;
     }
 
     .product-sku-detail {
       font-size: 0.69rem;
       color: #64748b;
       margin-top: 0.1rem;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: monospace;
     }
 
     .pill-type {
@@ -1604,7 +1432,6 @@ interface RestockItem {
       border-radius: 5px;
       font-size: 0.68rem;
       font-weight: 700;
-      letter-spacing: 0.03em;
     }
 
     .pill-type.entrada {
@@ -1614,15 +1441,9 @@ interface RestockItem {
     }
 
     .pill-type.salida {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #e2e8f0;
-    }
-
-    .pill-type.traspaso {
-      background: #eff6ff;
-      color: #2563eb;
-      border: 1px solid #dbeafe;
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
     }
 
     .type-dot {
@@ -1642,38 +1463,16 @@ interface RestockItem {
       color: #dc2626;
     }
 
-    .qty-neutral {
-      font-weight: 700;
-      color: #0f172a;
-    }
-
-    .location-cell {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
     .location-badge {
       display: inline-block;
       padding: 0.18rem 0.5rem;
       background: #f1f5f9;
       border: 1px solid #e2e8f0;
       border-radius: 5px;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: monospace;
       font-size: 0.69rem;
       font-weight: 600;
       color: #334155;
-    }
-
-    .location-highlight {
-      background: #fef9c3;
-      border-color: #fef08a;
-      color: #a16207;
-    }
-
-    .arrow-sep {
-      color: #94a3b8;
-      font-size: 0.75rem;
     }
 
     .operator-cell {
@@ -1691,7 +1490,6 @@ interface RestockItem {
       justify-content: center;
       font-size: 0.64rem;
       font-weight: 700;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     }
 
     .operator-name {
@@ -1721,105 +1519,16 @@ interface RestockItem {
       color: #059669;
     }
 
-    .status-pill.transit {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      color: #d97706;
-    }
-
     .status-pill.verification {
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      color: #475569;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
     }
 
-    .table-pagination-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 1rem;
-      border-top: 1px solid #f1f5f9;
-      flex-wrap: wrap;
-      gap: 0.85rem;
-    }
-
-    .pagination-count {
-      font-size: 0.74rem;
-      color: #64748b;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-pag-nav {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 0.32rem 0.7rem;
-      font-size: 0.74rem;
-      color: #64748b;
-      cursor: pointer;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-      transition: all 0.15s ease;
-      font-family: inherit;
-    }
-
-    .btn-pag-nav:hover:not(:disabled) {
-      background: #f8fafc;
-      color: #0f172a;
-      border-color: #94a3b8;
-    }
-
-    .btn-pag-nav:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-pag-num {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      border-radius: 6px;
-      font-size: 0.74rem;
-      color: #64748b;
-      cursor: pointer;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-      transition: all 0.15s ease;
-      font-family: inherit;
-    }
-
-    .btn-pag-num:hover:not(.active) {
-      background: #f8fafc;
-      color: #0f172a;
-      border-color: #94a3b8;
-    }
-
-    .btn-pag-num.active {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: #ffffff;
-      font-weight: 700;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-    }
-
-    /* Responsive */
     @media (max-width: 1024px) {
-      .kpis-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      .mid-section-grid {
-        grid-template-columns: 1fr;
-      }
-      .shortcuts-grid {
-        grid-template-columns: 1fr;
-      }
+      .kpis-grid { grid-template-columns: repeat(2, 1fr); }
+      .mid-section-grid { grid-template-columns: 1fr; }
+      .shortcuts-grid { grid-template-columns: 1fr; }
     }
   `]
 })
@@ -1827,108 +1536,312 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly dashboardService = inject(DashboardService);
   private readonly authService = inject(AuthService);
   private readonly productsService = inject(ProductsService);
+  private readonly saleService = inject(SaleService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly ngZone = inject(NgZone);
 
   private productsSub?: Subscription;
+  private salesSub?: Subscription;
 
   selectedWarehouse = 'central-a';
   searchFilter = '';
   productsSearchFilter = '';
   activeTab = 'Todos';
 
+  // 1. Filtro de Fecha Específica en la Cabecera
+  selectedDay: string = '';
+
+  // 2. Filtro de Lapso Independiente para el KPI 4
+  kpiOrdersLapse: 'day' | 'today' | '7d' | '30d' | 'all' = 'day';
+
+  // 3. Filtro de Lapso Independiente para la Gráfica Semanal
+  chartLapse: '7d' | '30d' | 'custom' = '7d';
+  chartStartDate: string = '';
+  chartEndDate: string = '';
+
   products: ProductItem[] = [];
+  sales: SaleDto[] = [];
 
-  restockItems: RestockItem[] = [];
+  get currentDateDisplay(): string {
+    const now = new Date();
+    return now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
 
-  transactions: Transaction[] = [
-    {
-      sku: 'SEN-IR-5001',
-      product: 'Sensor Infrarrojo Proximidad',
-      detail: 'SEN-IR-5001 | Lote #9822',
-      type: 'ENTRADA',
-      quantity: '+450 uds',
-      isPositive: true,
-      location: 'A-02-N1',
-      operator: 'Marcos Rivas',
-      operatorInitials: 'MR',
-      operatorBg: '#dbeafe',
-      operatorColor: '#1d4ed8',
-      dateTime: 'Hoy, 10:42 AM',
-      status: 'Completado'
-    },
-    {
-      sku: 'PWR-24V-10A',
-      product: 'Fuente de Alimentación 24V 10A',
-      detail: 'PWR-24V-10A | Despacho #4410',
-      type: 'SALIDA',
-      quantity: '-35 uds',
-      isPositive: false,
-      location: 'D-09-N3',
-      operator: 'Lucía Castro',
-      operatorInitials: 'LC',
-      operatorBg: '#ede9fe',
-      operatorColor: '#6d28d9',
-      dateTime: 'Hoy, 09:58 AM',
-      status: 'Completado'
-    },
-    {
-      sku: 'MOD-BLE-05',
-      product: 'Módulo Bluetooth 5.0 Low Energy',
-      detail: 'MOD-BLE-05 | Lote #3109',
-      type: 'TRASPASO',
-      quantity: '120 uds',
-      isPositive: false,
-      isNeutral: true,
-      location: 'B-01',
-      toLocation: 'C-04',
-      operator: 'Esteban Gil',
-      operatorInitials: 'EG',
-      operatorBg: '#cffafe',
-      operatorColor: '#0e7490',
-      dateTime: 'Hoy, 09:15 AM',
-      status: 'En Tránsito'
-    },
-    {
-      sku: 'ALU-4040-2M',
-      product: 'Perfil Aluminio Estructural 40x40',
-      detail: 'ALU-4040-2M | Despacho #4409',
-      type: 'SALIDA',
-      quantity: '-80 barras',
-      isPositive: false,
-      location: 'F-01-N0',
-      operator: 'Lucía Castro',
-      operatorInitials: 'LC',
-      operatorBg: '#ede9fe',
-      operatorColor: '#6d28d9',
-      dateTime: 'Hoy, 08:30 AM',
-      status: 'Completado'
-    },
-    {
-      sku: 'CON-M12-5P',
-      product: 'Conector Industrial M12 5-Pines',
-      detail: 'CON-M12-5P | Control de Calidad',
-      type: 'ENTRADA',
-      quantity: '+600 uds',
-      isPositive: true,
-      location: 'Z-CUAR-01',
-      locationHighlight: true,
-      operator: 'Marcos Rivas',
-      operatorInitials: 'MR',
-      operatorBg: '#dbeafe',
-      operatorColor: '#1d4ed8',
-      dateTime: 'Ayer, 18:20 PM',
-      status: 'En Verificación'
+  private getStockNum(p: ProductItem): number {
+    const raw = String(p.stockAvailable || p.stockTotal || '0').replace(/[^0-9-]/g, '');
+    const n = parseInt(raw, 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  get totalUnitsInStock(): number {
+    return this.products.reduce((acc, p) => acc + this.getStockNum(p), 0);
+  }
+
+  get totalInventoryValue(): number {
+    return this.products.reduce((acc, p) => {
+      const qty = this.getStockNum(p);
+      const rawPrice = String(p.costPrice || p.salePrice || '0').replace(/[^0-9.]/g, '');
+      const price = parseFloat(rawPrice) || 0;
+      return acc + qty * price;
+    }, 0);
+  }
+
+  get availabilityPercent(): number {
+    if (this.products.length === 0) return 0;
+    const avail = this.products.filter(p => this.getStockNum(p) > 0).length;
+    return Math.round((avail / this.products.length) * 100);
+  }
+
+  get criticalStockCount(): number {
+    return this.products.filter(p => this.isUnderFive(p)).length;
+  }
+
+  get outOfStockCount(): number {
+    return this.products.filter(p => this.getStockNum(p) <= 0).length;
+  }
+
+  // --- FILTRO INDEPENDIENTE PARA KPI 4 ---
+  get kpiSalesFiltered(): SaleDto[] {
+    if (this.kpiOrdersLapse === 'all') {
+      return this.sales;
     }
-  ];
+    const todayStr = new Date().toISOString().substring(0, 10);
+
+    if (this.kpiOrdersLapse === 'day') {
+      const target = this.selectedDay || todayStr;
+      return this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) === target);
+    }
+    if (this.kpiOrdersLapse === 'today') {
+      return this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) === todayStr);
+    }
+
+    const days = this.kpiOrdersLapse === '7d' ? 7 : 30;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().substring(0, 10);
+
+    return this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) >= cutoffStr);
+  }
+
+  get kpiPaidSalesCount(): number {
+    return this.kpiSalesFiltered.filter(s => s.isPaid).length;
+  }
+
+  get kpiPaidOrdersPercent(): number {
+    if (this.kpiSalesFiltered.length === 0) return 0;
+    return Math.round((this.kpiPaidSalesCount / this.kpiSalesFiltered.length) * 100);
+  }
+
+  // --- GRÁFICA DE MOVIMIENTOS Y VENTAS CON LAPSOS INDEPENDIENTES ---
+  setChartLapse(lapse: '7d' | '30d' | 'custom'): void {
+    this.chartLapse = lapse;
+    if (lapse === 'custom' && !this.chartStartDate) {
+      const d = new Date();
+      this.chartEndDate = d.toISOString().substring(0, 10);
+      d.setDate(d.getDate() - 14);
+      this.chartStartDate = d.toISOString().substring(0, 10);
+    }
+    this.cdr.detectChanges();
+  }
+
+  get chartPoints(): ChartDayPoint[] {
+    const points: ChartDayPoint[] = [];
+    let numDays = 7;
+    let startDate = new Date();
+
+    if (this.chartLapse === '7d') {
+      numDays = 7;
+      startDate.setDate(startDate.getDate() - (numDays - 1));
+    } else if (this.chartLapse === '30d') {
+      numDays = 30;
+      startDate.setDate(startDate.getDate() - (numDays - 1));
+    } else {
+      const s = this.chartStartDate ? new Date(this.chartStartDate) : new Date();
+      const e = this.chartEndDate ? new Date(this.chartEndDate) : new Date();
+      const diff = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 3600 * 24)) + 1);
+      numDays = Math.min(60, diff);
+      startDate = new Date(s);
+    }
+
+    const daySalesMap = new Map<string, { salesCount: number; salesAmount: number; ordersCount: number; ordersAmount: number }>();
+
+    for (const s of this.sales) {
+      if (!s.createdAt) continue;
+      const dKey = s.createdAt.substring(0, 10);
+      const entry = daySalesMap.get(dKey) || { salesCount: 0, salesAmount: 0, ordersCount: 0, ordersAmount: 0 };
+      if (s.isPaid) {
+        entry.salesCount += 1;
+        entry.salesAmount += (s.totalAmount || 0);
+      } else {
+        entry.ordersCount += 1;
+        entry.ordersAmount += (s.totalAmount || 0);
+      }
+      daySalesMap.set(dKey, entry);
+    }
+
+    const stepX = 580 / Math.max(1, numDays - 1);
+    let maxVal = 1;
+
+    for (let i = 0; i < numDays; i++) {
+      const cur = new Date(startDate);
+      cur.setDate(cur.getDate() + i);
+      const iso = cur.toISOString().substring(0, 10);
+      const stat = daySalesMap.get(iso) || { salesCount: 0, salesAmount: 0, ordersCount: 0, ordersAmount: 0 };
+      maxVal = Math.max(maxVal, stat.salesCount, stat.ordersCount);
+    }
+
+    for (let i = 0; i < numDays; i++) {
+      const cur = new Date(startDate);
+      cur.setDate(cur.getDate() + i);
+      const iso = cur.toISOString().substring(0, 10);
+      const stat = daySalesMap.get(iso) || { salesCount: 0, salesAmount: 0, ordersCount: 0, ordersAmount: 0 };
+
+      const salesH = stat.salesCount > 0 ? Math.max(8, Math.round((stat.salesCount / maxVal) * 110)) : 0;
+      const ordersH = stat.ordersCount > 0 ? Math.max(8, Math.round((stat.ordersCount / maxVal) * 110)) : 0;
+      const salesY = 170 - salesH;
+      const ordersY = 170 - ordersH;
+      const x = 35 + (i * stepX);
+
+      const label = numDays <= 14 
+        ? cur.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '').toUpperCase() 
+        : `${cur.getDate()}/${cur.getMonth() + 1}`;
+
+      points.push({
+        label,
+        fullDate: iso,
+        salesCount: stat.salesCount,
+        salesAmount: stat.salesAmount,
+        ordersCount: stat.ordersCount,
+        ordersAmount: stat.ordersAmount,
+        salesH,
+        salesY,
+        ordersH,
+        ordersY,
+        x
+      });
+    }
+
+    return points;
+  }
+
+  get chartAreaPath(): string {
+    if (this.chartPoints.length < 2) return '';
+    let d = `M ${this.chartPoints[0].x} ${this.chartPoints[0].salesY}`;
+    for (let i = 1; i < this.chartPoints.length; i++) {
+      const prev = this.chartPoints[i - 1];
+      const cur = this.chartPoints[i];
+      const cx = (prev.x + cur.x) / 2;
+      d += ` C ${cx} ${prev.salesY}, ${cx} ${cur.salesY}, ${cur.x} ${cur.salesY}`;
+    }
+    const last = this.chartPoints[this.chartPoints.length - 1];
+    d += ` L ${last.x} 170 L ${this.chartPoints[0].x} 170 Z`;
+    return d;
+  }
+
+  get chartLinePath(): string {
+    if (this.chartPoints.length < 2) return '';
+    let d = `M ${this.chartPoints[0].x} ${this.chartPoints[0].salesY}`;
+    for (let i = 1; i < this.chartPoints.length; i++) {
+      const prev = this.chartPoints[i - 1];
+      const cur = this.chartPoints[i];
+      const cx = (prev.x + cur.x) / 2;
+      d += ` C ${cx} ${prev.salesY}, ${cx} ${cur.salesY}, ${cur.x} ${cur.salesY}`;
+    }
+    return d;
+  }
+
+  get chartTotalSalesAmount(): number {
+    return this.chartPoints.reduce((acc, p) => acc + p.salesAmount, 0);
+  }
+
+  get chartTotalSalesUnits(): number {
+    return this.chartPoints.reduce((acc, p) => acc + p.salesCount, 0);
+  }
+
+  get chartTotalOrdersAmount(): number {
+    return this.chartPoints.reduce((acc, p) => acc + p.ordersAmount, 0);
+  }
+
+  get chartTotalOrdersUnits(): number {
+    return this.chartPoints.reduce((acc, p) => acc + p.ordersCount, 0);
+  }
+
+  // --- REABASTECIMIENTO CRÍTICO ---
+  get restockItems(): RestockItem[] {
+    return this.products
+      .filter(p => this.isUnderFive(p))
+      .map(p => ({
+        name: p.name,
+        badge: this.getStockNum(p) <= 0 ? 'CRÍTICO' : 'BAJO',
+        badgeType: this.getStockNum(p) <= 0 ? 'critical' : 'low',
+        sku: p.sku,
+        stockActual: p.stockAvailable || '0',
+        stockMin: p.minStock ?? 5,
+        aisle: p.location || 'Almacén Central'
+      }));
+  }
+
+  // --- TRANSACCIONES CON FILTRO DE FECHA SUPERIOR ---
+  get transactions(): Transaction[] {
+    const list: Transaction[] = [];
+    const filteredSales = this.selectedDay
+      ? this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) === this.selectedDay)
+      : this.sales;
+
+    for (const s of filteredSales) {
+      const initials = (s.scheduledBy || 'OP')
+        .split(' ')
+        .filter(Boolean)
+        .map(w => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'OP';
+
+      if (s.details && s.details.length > 0) {
+        for (const d of s.details) {
+          list.push({
+            sku: d.productSku,
+            product: d.productName,
+            detail: `${d.productSku} | ${s.isPaid ? 'Venta #' + s.id : 'Pedido #' + s.id} (${s.clientName})`,
+            type: s.isPaid ? 'ENTRADA' : 'SALIDA',
+            quantity: `${d.quantity} uds`,
+            isPositive: s.isPaid,
+            location: 'Almacén Central',
+            operator: s.scheduledBy || 'Administrador',
+            operatorInitials: initials,
+            operatorBg: s.isPaid ? '#dcfce7' : '#fee2e2',
+            operatorColor: s.isPaid ? '#15803d' : '#dc2626',
+            dateTime: new Date(s.createdAt).toLocaleString(),
+            status: s.isPaid ? 'Completado' : 'En Verificación'
+          });
+        }
+      } else {
+        list.push({
+          sku: `ORD-${s.id}`,
+          product: `Orden #${s.id} - ${s.clientName}`,
+          detail: `Cliente: ${s.clientName}`,
+          type: s.isPaid ? 'ENTRADA' : 'SALIDA',
+          quantity: `${s.quantity} uds`,
+          isPositive: s.isPaid,
+          location: 'Almacén Central',
+          operator: s.scheduledBy || 'Administrador',
+          operatorInitials: initials,
+          operatorBg: s.isPaid ? '#dcfce7' : '#fee2e2',
+          operatorColor: s.isPaid ? '#15803d' : '#dc2626',
+          dateTime: new Date(s.createdAt).toLocaleString(),
+          status: s.isPaid ? 'Completado' : 'En Verificación'
+        });
+      }
+    }
+    return list;
+  }
 
   get filteredTransactions(): Transaction[] {
     return this.transactions.filter(item => {
       const matchesTab = 
         this.activeTab === 'Todos' ||
-        (this.activeTab === 'Entradas' && item.type === 'ENTRADA') ||
-        (this.activeTab === 'Salidas' && item.type === 'SALIDA') ||
-        (this.activeTab === 'Traspasos' && item.type === 'TRASPASO');
+        (this.activeTab === 'Ventas' && item.isPositive) ||
+        (this.activeTab === 'Pedidos' && !item.isPositive);
 
       const matchesSearch = 
         !this.searchFilter.trim() ||
@@ -1941,29 +1854,44 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    console.log('[Dashboard] Solicitando métricas consolidadas desde la base de datos/API...');
+    // Inicializar fecha de hoy por defecto para el selector de día específico
+    const today = new Date();
+    this.selectedDay = today.toISOString().substring(0, 10);
+
     this.dashboardService.getDashboardData().subscribe({
-      next: (data) => {
-        console.log('[Dashboard] Datos recibidos desde la base de datos:', data);
-      },
-      error: (err) => {
-        console.warn('[Dashboard] Sin respuesta o error de conexión con API de dashboard:', err);
-      }
+      next: () => {},
+      error: () => {}
     });
 
     this.loadProducts();
+    this.loadSales();
   }
 
   ngOnDestroy(): void {
     this.productsSub?.unsubscribe();
+    this.salesSub?.unsubscribe();
   }
 
   trackBySku(_: number, prod: ProductItem): string {
     return prod.id || prod.sku;
   }
 
+  onDateFilterChange(): void {
+    this.cdr.detectChanges();
+  }
+
+  loadSales(): void {
+    this.salesSub = this.saleService.sales$.subscribe((items) => {
+      this.ngZone.run(() => {
+        this.sales = [...(items || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.saleService.getSales().subscribe();
+  }
+
   loadProducts(): void {
-    console.log('[Dashboard] Suscripción en tiempo real a ProductsService...');
     this.productsSub = this.productsService.products$.subscribe((items) => {
       this.ngZone.run(() => {
         this.products = [...(items || [])];
@@ -1978,16 +1906,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.cdr.detectChanges();
         });
       },
-      error: (err) => {
-        console.warn('[Dashboard] Error cargando productos:', err);
+      error: () => {
         this.cdr.detectChanges();
       }
     });
   }
 
   isUnderFive(prod: ProductItem): boolean {
-    const qty = parseInt(prod.stockAvailable || prod.stockTotal || '0', 10);
-    return isNaN(qty) ? false : (qty < 5 || prod.stockStatusClass === 'critical' || prod.stockStatus === 'STOCK CRÍTICO');
+    const qty = this.getStockNum(prod);
+    return qty < (prod.minStock ?? 5) || prod.stockStatusClass === 'critical' || prod.stockStatus === 'STOCK CRÍTICO';
   }
 
   get filteredProductsList(): ProductItem[] {
@@ -2003,36 +1930,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
     );
   }
 
-  getStatusClass(status: string): string {
-    switch (status) {
-      case 'Completado': return 'completed';
-      case 'En Tránsito': return 'transit';
-      case 'En Verificación': return 'verification';
-      default: return '';
-    }
-  }
-
-  onExportBalance(): void {
-    // Feedback visual o exportación
-  }
-
-  onNewExit(): void {
-    // Apertura de modal o formulario
-  }
-
-  onRegisterEntry(): void {
-    // Apertura de modal o formulario
-  }
-
-  onShortcutClick(type: string): void {
-    // Acceso a terminales o auditorías
-  }
-
-  onRequestRestock(item: RestockItem): void {
-    // Solicitud rápida de pedido
-  }
+  onExportBalance(): void {}
+  onShortcutClick(type: string): void {}
+  onRequestRestock(item: RestockItem): void {}
 
   refreshTransactions(): void {
-    // Refresco de datos
+    this.saleService.getSales().subscribe();
+    this.productsService.getProducts().subscribe();
   }
 }

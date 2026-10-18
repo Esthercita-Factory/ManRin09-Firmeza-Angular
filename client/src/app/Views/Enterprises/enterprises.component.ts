@@ -1,20 +1,32 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import Swal from 'sweetalert2';
+import { SaleService, SaleDto, CreateSaleDto } from '../../Services/sale.service';
+import { ProductsService, ProductItem } from '../../Services/products.service';
+import { ClientService, ClientDto } from '../../Services/client.service';
 
-export interface MovementItem {
-  id: string;
+export interface MovementRow {
+  saleId: number;
+  detailId: number;
+  productId: string;
   sku: string;
-  product: string;
-  type: 'ENTRADA' | 'SALIDA' | 'TRASPASO';
+  productName: string;
   quantity: number;
-  unit: string;
+  unitPrice: number;
+  subtotal: number;
+  totalSaleAmount: number;
   location: string;
-  targetOrSource: string;
+  clientId: number;
+  clientName: string;
+  paymentMethod: string;
   referenceDoc: string;
   operator: string;
-  date: string;
-  status: 'Completado' | 'En Tránsito' | 'En Verificación';
+  createdAt: string;
+  isPaid: boolean;
+  typeLabel: 'PEDIDO' | 'VENTA';
+  statusLabel: 'Pedido' | 'Vendido';
 }
 
 @Component({
@@ -23,36 +35,48 @@ export interface MovementItem {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="fz-viewport movements-view">
-      <!-- 1. Encabezado Principal de Movimientos -->
+      <!-- 1. Encabezado Principal de Movimientos y Pedidos -->
       <header class="header-section">
         <div class="header-titles">
           <div class="title-with-badge">
             <h1 class="page-title">Movimientos y Pedidos</h1>
             <span class="live-badge">
               <span class="pulse-dot"></span>
-              GESTIÓN OPERATIVA
+              CONECTADO A BASE DE DATOS
             </span>
           </div>
-          <p class="page-subtitle">Registro centralizado de entradas, salidas y despachos de almacén.</p>
+          <p class="page-subtitle">
+            Control en tiempo real de pedidos en rojo (pendientes) y ventas en verde (vendidos).
+          </p>
         </div>
 
         <div class="header-actions">
-          <!-- Botón Nueva Salida -->
-          <button class="btn-action-dark" (click)="openExitModal()">
+          <!-- Botón Nuevo Cliente Rápido -->
+          <button class="btn-action-outline" (click)="openClientModal()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="7" y1="17" x2="17" y2="7"></line>
-              <polyline points="7 7 17 7 17 17"></polyline>
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
             </svg>
-            <span>Nueva Salida</span>
+            <span>Nuevo Cliente</span>
           </button>
 
-          <!-- Botón Registrar Entrada -->
-          <button class="btn-action-blue" (click)="openEntryModal()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
+          <!-- Botón Nuevo Pedido (Rojo) -->
+          <button class="btn-action-red" (click)="openOrderModal(false)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
-            <span>Registrar Entrada</span>
+            <span>Nuevo Pedido (Rojo)</span>
+          </button>
+
+          <!-- Botón Registrar Venta Directa (Verde) -->
+          <button class="btn-action-green" (click)="openOrderModal(true)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Registrar Venta (Verde)</span>
           </button>
         </div>
       </header>
@@ -65,44 +89,48 @@ export interface MovementItem {
         <span>{{ successMessage }}</span>
       </div>
 
-      <!-- 3. Tarjetas Resumen (KPIs) -->
+      <!-- 3. Tarjetas Resumen (KPIs en 0 cuando no hay datos) -->
       <section class="metrics-grid">
-        <div class="metric-card">
+        <!-- Total Ventas (Verde) -->
+        <div class="metric-card card-green-border">
           <div class="metric-icon entry-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2">
-              <polyline points="12 19 12 5 5 12"></polyline>
-              <polyline points="19 12 12 5 5 12"></polyline>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.4">
+              <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
           <div class="metric-data">
-            <span class="metric-label">Total Entradas</span>
-            <span class="metric-value">{{ totalEntries }}</span>
+            <span class="metric-label">Ventas Completadas (Verde)</span>
+            <span class="metric-value text-green">{{ totalSalesCount }}</span>
+            <span class="metric-sub">\${{ totalSalesRevenue | number:'1.2-2' }} recaudado</span>
           </div>
         </div>
 
-        <div class="metric-card">
+        <!-- Total Pedidos (Rojo) -->
+        <div class="metric-card card-red-border">
           <div class="metric-icon exit-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2">
-              <polyline points="12 5 12 19 19 12"></polyline>
-              <polyline points="5 12 12 19 19 12"></polyline>
-            </svg>
-          </div>
-          <div class="metric-data">
-            <span class="metric-label">Total Salidas</span>
-            <span class="metric-value">{{ totalExits }}</span>
-          </div>
-        </div>
-
-        <div class="metric-card">
-          <div class="metric-icon pending-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.4">
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
           </div>
           <div class="metric-data">
-            <span class="metric-label">En Verificación</span>
-            <span class="metric-value">{{ totalPending }}</span>
+            <span class="metric-label">Pedidos Pendientes (Rojo)</span>
+            <span class="metric-value text-red">{{ totalOrdersCount }}</span>
+            <span class="metric-sub">\${{ totalOrdersPendingAmount | number:'1.2-2' }} por cobrar</span>
+          </div>
+        </div>
+
+        <!-- Total Movimientos / Unidades -->
+        <div class="metric-card">
+          <div class="metric-icon pending-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <span class="metric-label">Total Movimientos</span>
+            <span class="metric-value">{{ movementRows.length }}</span>
+            <span class="metric-sub">{{ totalUnitsMoved }} unidades movilizadas</span>
           </div>
         </div>
       </section>
@@ -110,10 +138,12 @@ export interface MovementItem {
       <!-- 4. Filtros y Búsqueda -->
       <section class="filter-bar">
         <div class="tabs-container">
-          <button 
-            *ngFor="let tab of tabs" 
-            [class.active]="activeTab === tab" 
-            (click)="activeTab = tab" 
+          <button
+            *ngFor="let tab of tabs"
+            [class.active]="activeTab === tab"
+            [class.tab-red]="tab === 'Pedidos (Rojo)' && activeTab === tab"
+            [class.tab-green]="tab === 'Ventas (Verde)' && activeTab === tab"
+            (click)="activeTab = tab"
             class="tab-btn"
           >
             {{ tab }}
@@ -125,16 +155,16 @@ export interface MovementItem {
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input 
-            type="text" 
-            [(ngModel)]="searchQuery" 
-            placeholder="Buscar por SKU, producto o documento..." 
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            placeholder="Buscar por SKU, producto, cliente o folio..."
             class="search-input"
           />
         </div>
       </section>
 
-      <!-- 5. Tabla de Movimientos -->
+      <!-- 5. Tabla de Movimientos, Pedidos (Rojo) y Ventas (Verde) -->
       <div class="table-card">
         <table class="movements-table">
           <thead>
@@ -142,161 +172,276 @@ export interface MovementItem {
               <th>TIPO</th>
               <th>CÓDIGO / PRODUCTO</th>
               <th>CANTIDAD</th>
-              <th>ALMACÉN / UBICACIÓN</th>
-              <th>PROVEEDOR / CLIENTE</th>
-              <th>DOCUMENTO</th>
+              <th>SUBTOTAL</th>
+              <th>CLIENTE</th>
+              <th>DOCUMENTO / OPERADOR</th>
               <th>FECHA Y HORA</th>
               <th>ESTADO</th>
+              <th style="text-align: center;">ACCIÓN</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let item of filteredMovements">
+            <tr
+              *ngFor="let row of filteredMovements"
+              [class.row-pedido-red]="!row.isPaid"
+              [class.row-venta-green]="row.isPaid"
+            >
+              <!-- Columna TIPO: PEDIDO (ROJO) o VENTA (VERDE) -->
               <td>
-                <span class="type-badge" [ngClass]="item.type.toLowerCase()">
-                  {{ item.type }}
+                <span class="type-badge" [ngClass]="row.isPaid ? 'venta-green' : 'pedido-red'">
+                  <span class="status-dot" [ngClass]="row.isPaid ? 'dot-green' : 'dot-red'"></span>
+                  {{ row.typeLabel }}
                 </span>
               </td>
+
+              <!-- Columna PRODUCTO / SKU -->
               <td>
                 <div class="product-cell">
-                  <span class="product-name">{{ item.product }}</span>
-                  <span class="product-sku">SKU: {{ item.sku }}</span>
+                  <span class="product-name">{{ row.productName }}</span>
+                  <span class="product-sku">SKU: {{ row.sku }} • P.Unit: \${{ row.unitPrice | number:'1.2-2' }}</span>
                 </div>
               </td>
+
+              <!-- Columna CANTIDAD -->
               <td>
-                <span class="quantity-tag" [class.positive]="item.type === 'ENTRADA'" [class.negative]="item.type === 'SALIDA'">
-                  {{ item.type === 'ENTRADA' ? '+' : '-' }}{{ item.quantity }} {{ item.unit }}
+                <span class="quantity-tag" [ngClass]="row.isPaid ? 'positive-green' : 'negative-red'">
+                  {{ row.quantity }} uds
                 </span>
               </td>
+
+              <!-- Columna SUBTOTAL -->
               <td>
-                <span class="location-chip">{{ item.location }}</span>
-              </td>
-              <td>
-                <span class="entity-text">{{ item.targetOrSource }}</span>
-              </td>
-              <td>
-                <span class="doc-code">{{ item.referenceDoc }}</span>
-              </td>
-              <td>
-                <span class="date-text">{{ item.date }}</span>
-              </td>
-              <td>
-                <span class="status-badge" [ngClass]="item.status.toLowerCase().replace(' ', '-')">
-                  {{ item.status }}
+                <span class="subtotal-amount" [ngClass]="row.isPaid ? 'positive-green' : 'negative-red'">
+                  \${{ row.subtotal | number:'1.2-2' }}
                 </span>
+              </td>
+
+              <!-- Columna CLIENTE -->
+              <td>
+                <div class="product-cell">
+                  <span class="entity-text">{{ row.clientName }}</span>
+                  <span class="product-sku">Pago: {{ formatPayMethod(row.paymentMethod) }}</span>
+                </div>
+              </td>
+
+              <!-- Columna DOCUMENTO / OPERADOR -->
+              <td>
+                <div class="product-cell">
+                  <span class="doc-code">{{ row.referenceDoc }}</span>
+                  <span class="product-sku">Por: {{ row.operator }}</span>
+                </div>
+              </td>
+
+              <!-- Columna FECHA -->
+              <td>
+                <span class="date-text">{{ row.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+              </td>
+
+              <!-- Columna ESTADO: Pedido (Rojo) vs Vendido (Verde) -->
+              <td>
+                <span class="status-badge" [ngClass]="row.isPaid ? 'status-vendido-green' : 'status-pedido-red'">
+                  {{ row.statusLabel }}
+                </span>
+              </td>
+
+              <!-- Columna ACCIONES -->
+              <td style="text-align: center;">
+                <div class="actions-cell">
+                  <!-- Si es un Pedido (Rojo), botón para Vender y pasarlo a Verde -->
+                  <button
+                    *ngIf="!row.isPaid"
+                    class="btn-mark-sold"
+                    (click)="onToggleSaleStatus(row)"
+                    [disabled]="togglingSaleId === row.saleId"
+                    title="Confirmar venta y cambiar estado a Vendido (Verde)"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>{{ togglingSaleId === row.saleId ? '...' : 'Vender' }}</span>
+                  </button>
+
+                  <!-- Si ya está Vendido (Verde), opción de revertir a Pedido si se requiere -->
+                  <button
+                    *ngIf="row.isPaid"
+                    class="btn-revert-order"
+                    (click)="onToggleSaleStatus(row)"
+                    [disabled]="togglingSaleId === row.saleId"
+                    title="Cambiar nuevamente a Pedido pendiente (Rojo)"
+                  >
+                    <span>Vendido ✓</span>
+                  </button>
+
+                  <!-- Eliminar registro (restaura stock en inventario) -->
+                  <button
+                    class="btn-delete-row"
+                    (click)="onDeleteSale(row)"
+                    title="Eliminar registro y devolver stock al inventario"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </div>
               </td>
             </tr>
+
             <tr *ngIf="filteredMovements.length === 0">
-              <td colspan="8" class="empty-cell">
-                No se encontraron movimientos registrados con el filtro actual.
+              <td colspan="9" class="empty-cell">
+                No hay movimientos, pedidos ni ventas registrados en la base de datos (0 registros).
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- 6. MODAL: Registrar Entrada -->
-      <div *ngIf="showEntryModal" class="modal-overlay" (click)="closeModals()">
+      <!-- 6. MODAL: Registrar Pedido (Rojo) o Venta (Verde) -->
+      <div *ngIf="showOrderModal" class="modal-overlay" (click)="closeModals()">
         <div class="modal-card" (click)="$event.stopPropagation()">
-          <div class="modal-header entry-header">
-            <h2>Registrar Entrada de Material</h2>
+          <div class="modal-header" [ngClass]="orderForm.isPaid ? 'green-header' : 'red-header'">
+            <h2>{{ orderForm.isPaid ? 'Registrar Venta Directa (Verde - Vendido)' : 'Registrar Nuevo Pedido (Rojo - Pendiente)' }}</h2>
             <button class="btn-close" (click)="closeModals()">×</button>
           </div>
 
-          <form (ngSubmit)="saveEntry()" class="modal-body">
+          <form (ngSubmit)="saveOrderOrSale()" class="modal-body">
+            <!-- Selección de Cliente de la BD -->
             <div class="form-group">
-              <label>Producto / SKU *</label>
-              <input type="text" [(ngModel)]="entryForm.product" name="entryProduct" required placeholder="Ej: SEN-IR-5001 Sensor Infrarrojo" class="form-control" />
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label>Cliente (Base de Datos) *</label>
+                <button type="button" class="btn-inline-link" (click)="openClientModal()">+ Crear cliente</button>
+              </div>
+              <select [(ngModel)]="orderForm.clientId" name="orderClientId" required class="form-control">
+                <option [ngValue]="0" disabled>Seleccione un cliente registrado...</option>
+                <option *ngFor="let c of clients" [ngValue]="c.id">
+                  {{ c.fullName }} ({{ c.email }})
+                </option>
+              </select>
+              <small *ngIf="clients.length === 0" style="color: #dc2626; font-size: 0.74rem;">
+                No hay clientes en la base de datos. Haga clic en "+ Crear cliente" primero.
+              </small>
             </div>
 
+            <!-- Selección de Producto de la BD -->
+            <div class="form-group">
+              <label>Producto del Inventario *</label>
+              <select [(ngModel)]="orderForm.productId" name="orderProductId" (change)="onProductSelectChange()" required class="form-control">
+                <option value="" disabled>Seleccione un producto del inventario...</option>
+                <option *ngFor="let p of products" [value]="p.id">
+                  [{{ p.sku }}] {{ p.name }} — Disp: {{ p.stockAvailable }} — {{ p.salePrice }}
+                </option>
+              </select>
+              <small *ngIf="products.length === 0" style="color: #dc2626; font-size: 0.74rem;">
+                No hay productos registrados en el inventario (0 SKUs).
+              </small>
+            </div>
+
+            <!-- Cantidad y Precio Unitario -->
             <div class="form-row">
               <div class="form-group">
                 <label>Cantidad *</label>
-                <input type="number" [(ngModel)]="entryForm.quantity" name="entryQty" required min="1" class="form-control" />
+                <input
+                  type="number"
+                  [(ngModel)]="orderForm.quantity"
+                  name="orderQty"
+                  required
+                  min="1"
+                  class="form-control"
+                />
               </div>
-              <div class="form-group">
-                <label>Unidad</label>
 
-                <select [(ngModel)]="entryForm.unit" name="entryUnit" class="form-control">
-                  <option value="uds">Unidades (uds)</option>
-                  <option value="cajas">Cajas</option>
-                  <option value="kg">Kilogramos (kg)</option>
-                  <option value="lts">Litros (lts)</option>
+              <div class="form-group">
+                <label>Método de Pago *</label>
+                <select [(ngModel)]="orderForm.paymentMethod" name="orderPayMethod" class="form-control">
+                  <option value="Cash">Efectivo (Cash)</option>
+                  <option value="BankTransfer">Transferencia Bancaria</option>
+                  <option value="CreditCard">Tarjeta de Crédito</option>
+                  <option value="DebitCard">Tarjeta de Débito</option>
+                  <option value="Other">Otro</option>
                 </select>
               </div>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label>Almacén / Pasillo Destino *</label>
-                <input type="text" [(ngModel)]="entryForm.location" name="entryLocation" required placeholder="Ej: Nave A - Pasillo B-02" class="form-control" />
-              </div>
-              <div class="form-group">
-                <label>Proveedor / Origen *</label>
-                <input type="text" [(ngModel)]="entryForm.provider" name="entryProvider" required placeholder="Ej: Logística Global S.A." class="form-control" />
-              </div>
-            </div>
-
+            <!-- Selector de Estado Inicial: Pedido (Rojo) vs Vendido (Verde) -->
             <div class="form-group">
-              <label>Número de Lote / Guía de Recepción</label>
-              <input type="text" [(ngModel)]="entryForm.doc" name="entryDoc" placeholder="Ej: REC-2026-881" class="form-control" />
+              <label>Estado Inicial del Registro *</label>
+              <div class="state-selector-grid">
+                <button
+                  type="button"
+                  class="state-option-btn red-option"
+                  [class.selected]="!orderForm.isPaid"
+                  (click)="orderForm.isPaid = false"
+                >
+                  <span class="dot-red"></span>
+                  <span>PEDIDO (En Rojo)</span>
+                </button>
+                <button
+                  type="button"
+                  class="state-option-btn green-option"
+                  [class.selected]="orderForm.isPaid"
+                  (click)="orderForm.isPaid = true"
+                >
+                  <span class="dot-green"></span>
+                  <span>VENDIDO (En Verde)</span>
+                </button>
+              </div>
             </div>
 
             <div class="modal-footer">
               <button type="button" class="btn-secondary" (click)="closeModals()">Cancelar</button>
-              <button type="submit" class="btn-primary-blue">Guardar Entrada</button>
+              <button
+                type="submit"
+                [ngClass]="orderForm.isPaid ? 'btn-primary-green' : 'btn-primary-red'"
+                [disabled]="isSubmitting"
+              >
+                {{ isSubmitting ? 'Guardando...' : (orderForm.isPaid ? 'Confirmar Venta (Verde)' : 'Registrar Pedido (Rojo)') }}
+              </button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- 7. MODAL: Nueva Salida -->
-      <div *ngIf="showExitModal" class="modal-overlay" (click)="closeModals()">
+      <!-- 7. MODAL: Crear Cliente en Base de Datos -->
+      <div *ngIf="showClientModal" class="modal-overlay" (click)="closeClientModal()">
         <div class="modal-card" (click)="$event.stopPropagation()">
-          <div class="modal-header exit-header">
-            <h2>Registrar Salida de Material</h2>
-            <button class="btn-close" (click)="closeModals()">×</button>
+          <div class="modal-header blue-header">
+            <h2>Registrar Nuevo Cliente en Base de Datos</h2>
+            <button class="btn-close" (click)="closeClientModal()">×</button>
           </div>
 
-          <form (ngSubmit)="saveExit()" class="modal-body">
-            <div class="form-group">
-              <label>Producto / SKU *</label>
-              <input type="text" [(ngModel)]="exitForm.product" name="exitProduct" required placeholder="Ej: PWR-24V-10A Fuente de Alimentación" class="form-control" />
-            </div>
-
+          <form (ngSubmit)="saveNewClient()" class="modal-body">
             <div class="form-row">
               <div class="form-group">
-                <label>Cantidad a Despachar *</label>
-                <input type="number" [(ngModel)]="exitForm.quantity" name="exitQty" required min="1" class="form-control" />
+                <label>Nombre *</label>
+                <input type="text" [(ngModel)]="clientForm.firstName" name="clientFirstName" required placeholder="Ej: Roberto" class="form-control" />
               </div>
               <div class="form-group">
-                <label>Unidad</label>
-                <select [(ngModel)]="exitForm.unit" name="exitUnit" class="form-control">
-                  <option value="uds">Unidades (uds)</option>
-                  <option value="cajas">Cajas</option>
-                  <option value="kg">Kilogramos (kg)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>Almacén Origen *</label>
-                <input type="text" [(ngModel)]="exitForm.location" name="exitLocation" required placeholder="Ej: Nave A - Pasillo D-09" class="form-control" />
-              </div>
-              <div class="form-group">
-                <label>Cliente / Destino *</label>
-                <input type="text" [(ngModel)]="exitForm.client" name="exitClient" required placeholder="Ej: Distribuidora Andina S.A.S." class="form-control" />
+                <label>Apellido *</label>
+                <input type="text" [(ngModel)]="clientForm.lastName" name="clientLastName" required placeholder="Ej: Gómez" class="form-control" />
               </div>
             </div>
 
             <div class="form-group">
-              <label>Orden de Despacho / Pedido</label>
-              <input type="text" [(ngModel)]="exitForm.doc" name="exitDoc" placeholder="Ej: ORD-4412" class="form-control" />
+              <label>Correo Electrónico *</label>
+              <input type="email" [(ngModel)]="clientForm.email" name="clientEmail" required placeholder="cliente@empresa.com" class="form-control" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Teléfono *</label>
+                <input type="text" [(ngModel)]="clientForm.phone" name="clientPhone" required placeholder="+57 300 000 0000" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label>Contraseña Acceso *</label>
+                <input type="password" [(ngModel)]="clientForm.password" name="clientPassword" required placeholder="Mín. 6 caracteres" class="form-control" />
+              </div>
             </div>
 
             <div class="modal-footer">
-              <button type="button" class="btn-secondary" (click)="closeModals()">Cancelar</button>
-              <button type="submit" class="btn-primary-dark">Registrar Salida</button>
+              <button type="button" class="btn-secondary" (click)="closeClientModal()">Cancelar</button>
+              <button type="submit" class="btn-primary-blue" [disabled]="isCreatingClient">
+                {{ isCreatingClient ? 'Registrando...' : 'Guardar Cliente' }}
+              </button>
             </div>
           </form>
         </div>
@@ -359,7 +504,6 @@ export interface MovementItem {
       border-radius: 50%;
       background: #2563eb;
       box-shadow: 0 0 6px rgba(37, 99, 235, 0.8);
-      animation: fzPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
     }
 
     .page-subtitle {
@@ -372,47 +516,68 @@ export interface MovementItem {
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      flex-wrap: wrap;
     }
 
-    .btn-action-dark {
+    .btn-action-outline {
       display: inline-flex;
       align-items: center;
       gap: 0.45rem;
-      background: #0f172a;
+      background: #ffffff;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .btn-action-outline:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    .btn-action-red {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
       color: #ffffff;
       border: none;
       padding: 0.55rem 1.05rem;
       border-radius: 8px;
       font-size: 0.82rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.3);
       transition: all 0.18s ease;
     }
 
-    .btn-action-dark:hover {
-      background: #1e293b;
+    .btn-action-red:hover {
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
       transform: translateY(-1px);
     }
 
-    .btn-action-blue {
+    .btn-action-green {
       display: inline-flex;
       align-items: center;
       gap: 0.45rem;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: linear-gradient(135deg, #16a34a, #15803d);
       color: #ffffff;
       border: none;
       padding: 0.55rem 1.05rem;
       border-radius: 8px;
       font-size: 0.82rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 3px 10px rgba(22, 163, 74, 0.3);
       transition: all 0.18s ease;
     }
 
-    .btn-action-blue:hover {
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    .btn-action-green:hover {
+      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.45);
       transform: translateY(-1px);
     }
 
@@ -448,6 +613,14 @@ export interface MovementItem {
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
+    .card-green-border {
+      border-left: 4px solid #16a34a;
+    }
+
+    .card-red-border {
+      border-left: 4px solid #dc2626;
+    }
+
     .metric-icon {
       width: 44px;
       height: 44px;
@@ -457,9 +630,9 @@ export interface MovementItem {
       justify-content: center;
     }
 
-    .entry-icon { background: #f0fdf4; }
-    .exit-icon { background: #fef2f2; }
-    .pending-icon { background: #fffbeb; }
+    .entry-icon { background: #dcfce7; }
+    .exit-icon { background: #fee2e2; }
+    .pending-icon { background: #eff6ff; }
 
     .metric-data {
       display: flex;
@@ -467,17 +640,26 @@ export interface MovementItem {
     }
 
     .metric-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+      font-size: 0.74rem;
+      font-weight: 700;
       color: #64748b;
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
 
     .metric-value {
-      font-size: 1.45rem;
+      font-size: 1.5rem;
       font-weight: 800;
       color: #0f172a;
+    }
+
+    .metric-value.text-green { color: #16a34a; }
+    .metric-value.text-red { color: #dc2626; }
+
+    .metric-sub {
+      font-size: 0.74rem;
+      color: #64748b;
+      font-weight: 600;
     }
 
     .filter-bar {
@@ -501,9 +683,9 @@ export interface MovementItem {
     .tab-btn {
       background: transparent;
       border: none;
-      padding: 0.4rem 0.9rem;
+      padding: 0.45rem 0.95rem;
       font-size: 0.78rem;
-      font-weight: 600;
+      font-weight: 700;
       color: #64748b;
       border-radius: 6px;
       cursor: pointer;
@@ -513,6 +695,16 @@ export interface MovementItem {
     .tab-btn.active {
       background: #2563eb;
       color: #ffffff;
+    }
+
+    .tab-btn.tab-red {
+      background: #dc2626 !important;
+      color: #ffffff !important;
+    }
+
+    .tab-btn.tab-green {
+      background: #16a34a !important;
+      color: #ffffff !important;
     }
 
     .search-box {
@@ -561,23 +753,74 @@ export interface MovementItem {
     }
 
     .movements-table td {
-      padding: 0.95rem 1rem;
+      padding: 0.9rem 1rem;
       border-bottom: 1px solid #f1f5f9;
       font-size: 0.82rem;
     }
 
+    /* Filas en ROJO para Pedidos y en VERDE para Ventas */
+    .row-pedido-red {
+      background-color: rgba(254, 242, 242, 0.55);
+      border-left: 4px solid #dc2626;
+    }
+    .row-pedido-red:hover {
+      background-color: rgba(254, 226, 226, 0.65);
+    }
+
+    .row-venta-green {
+      background-color: rgba(240, 253, 244, 0.55);
+      border-left: 4px solid #16a34a;
+    }
+    .row-venta-green:hover {
+      background-color: rgba(220, 252, 231, 0.65);
+    }
+
     .type-badge {
-      display: inline-block;
-      font-size: 0.68rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
       font-weight: 800;
-      padding: 0.2rem 0.55rem;
+      padding: 0.25rem 0.65rem;
       border-radius: 6px;
       letter-spacing: 0.04em;
     }
 
-    .type-badge.entrada { background: #dcfce7; color: #15803d; }
-    .type-badge.salida { background: #fee2e2; color: #b91c1c; }
-    .type-badge.traspaso { background: #e0f2fe; color: #0369a1; }
+    .type-badge.pedido-red {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fca5a5;
+    }
+
+    .type-badge.venta-green {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .dot-red {
+      background: #dc2626;
+      box-shadow: 0 0 6px rgba(220, 38, 38, 0.6);
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .dot-green {
+      background: #16a34a;
+      box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
 
     .product-cell {
       display: flex;
@@ -595,39 +838,106 @@ export interface MovementItem {
       font-family: monospace;
     }
 
-    .quantity-tag {
-      font-weight: 700;
-    }
-    .quantity-tag.positive { color: #16a34a; }
-    .quantity-tag.negative { color: #dc2626; }
-
-    .location-chip {
-      background: #f1f5f9;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #334155;
+    .quantity-tag, .subtotal-amount {
+      font-weight: 800;
+      font-family: monospace;
+      font-size: 0.85rem;
     }
 
-    .entity-text { font-weight: 500; color: #334155; }
-    .doc-code { font-family: monospace; font-size: 0.76rem; color: #64748b; }
-    .date-text { color: #64748b; font-size: 0.76rem; }
+    .positive-green { color: #15803d; }
+    .negative-red { color: #dc2626; }
+
+    .entity-text { font-weight: 700; color: #1e293b; }
+    .doc-code { font-family: monospace; font-size: 0.78rem; font-weight: 700; color: #334155; }
+    .date-text { color: #475569; font-size: 0.76rem; font-weight: 500; }
 
     .status-badge {
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.2rem 0.55rem;
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 0.25rem 0.65rem;
       border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
-    .status-badge.completado { background: #ecfdf5; color: #059669; }
-    .status-badge.en-tránsito { background: #fffbeb; color: #d97706; }
-    .status-badge.en-verificación { background: #f1f5f9; color: #475569; }
+
+    .status-pedido-red {
+      background: #dc2626;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+    }
+
+    .status-vendido-green {
+      background: #16a34a;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+    }
+
+    .actions-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .btn-mark-sold {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-mark-sold:hover {
+      background: #15803d;
+      transform: translateY(-1px);
+    }
+
+    .btn-revert-order {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-revert-order:hover {
+      background: #fee2e2;
+      color: #dc2626;
+      border-color: #fca5a5;
+    }
+
+    .btn-delete-row {
+      background: #ffffff;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 0.32rem 0.45rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-delete-row:hover {
+      background: #fef2f2;
+    }
 
     .empty-cell {
       text-align: center;
       padding: 3rem;
       color: #94a3b8;
+      font-weight: 600;
     }
 
     /* Modal Styling */
@@ -660,11 +970,12 @@ export interface MovementItem {
       color: #ffffff;
     }
 
-    .entry-header { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
-    .exit-header { background: linear-gradient(135deg, #1e293b, #0f172a); }
+    .red-header { background: linear-gradient(135deg, #dc2626, #991b1b); }
+    .green-header { background: linear-gradient(135deg, #16a34a, #15803d); }
+    .blue-header { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
 
     .modal-header h2 {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       margin: 0;
     }
@@ -703,6 +1014,16 @@ export interface MovementItem {
       color: #475569;
     }
 
+    .btn-inline-link {
+      background: none;
+      border: none;
+      color: #2563eb;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+    }
+
     .form-control {
       padding: 0.55rem 0.75rem;
       border: 1px solid #cbd5e1;
@@ -717,11 +1038,45 @@ export interface MovementItem {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
+    .state-selector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .state-option-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.6rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      color: #475569;
+      transition: all 0.15s ease;
+    }
+
+    .state-option-btn.red-option.selected {
+      background: #fef2f2;
+      border-color: #dc2626;
+      color: #dc2626;
+    }
+
+    .state-option-btn.green-option.selected {
+      background: #f0fdf4;
+      border-color: #16a34a;
+      color: #15803d;
+    }
+
     .modal-footer {
       display: flex;
       justify-content: flex-end;
       gap: 0.75rem;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
     }
 
     .btn-secondary {
@@ -735,6 +1090,28 @@ export interface MovementItem {
       cursor: pointer;
     }
 
+    .btn-primary-red {
+      background: #dc2626;
+      color: #ffffff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-primary-green {
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     .btn-primary-blue {
       background: #2563eb;
       color: #ffffff;
@@ -742,221 +1119,402 @@ export interface MovementItem {
       padding: 0.55rem 1.1rem;
       border-radius: 8px;
       font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-primary-dark {
-      background: #0f172a;
-      color: #ffffff;
-      border: none;
-      padding: 0.55rem 1.1rem;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
     }
   `]
 })
-export class EnterprisesComponent implements OnInit {
-  tabs = ['Todos', 'Entradas', 'Salidas', 'Traspasos'];
+export class EnterprisesComponent implements OnInit, OnDestroy {
+  private readonly saleService = inject(SaleService);
+  private readonly productsService = inject(ProductsService);
+  private readonly clientService = inject(ClientService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private salesSub?: Subscription;
+  private productsSub?: Subscription;
+  private clientsSub?: Subscription;
+
+  tabs = ['Todos', 'Pedidos (Rojo)', 'Ventas (Verde)'];
   activeTab = 'Todos';
   searchQuery = '';
   successMessage = '';
 
-  showEntryModal = false;
-  showExitModal = false;
+  sales: SaleDto[] = [];
+  products: ProductItem[] = [];
+  clients: ClientDto[] = [];
 
-  entryForm = {
-    product: '',
-    quantity: 100,
-    unit: 'uds',
-    location: 'Nave A - Pasillo A-01',
-    provider: 'Logística Global S.A.',
-    doc: 'REC-2026-901'
+  showOrderModal = false;
+  showClientModal = false;
+  isSubmitting = false;
+  isCreatingClient = false;
+  togglingSaleId: number | null = null;
+
+  orderForm = {
+    clientId: 0,
+    productId: '',
+    quantity: 1,
+    paymentMethod: 'Cash',
+    isPaid: false
   };
 
-  exitForm = {
-    product: '',
-    quantity: 25,
-    unit: 'uds',
-    location: 'Nave A - Pasillo D-09',
-    client: 'Distribuidora Andina S.A.S.',
-    doc: 'ORD-2026-4412'
+  clientForm = {
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: ''
   };
 
-  movements: MovementItem[] = [
-    {
-      id: '1',
-      sku: 'SEN-IR-5001',
-      product: 'Sensor Infrarrojo Proximidad',
-      type: 'ENTRADA',
-      quantity: 450,
-      unit: 'uds',
-      location: 'Nave A (A-02-N1)',
-      targetOrSource: 'Logística Global S.A.',
-      referenceDoc: 'REC-2026-9822',
-      operator: 'Marcos Rivas',
-      date: 'Hoy, 10:42 AM',
-      status: 'Completado'
-    },
-    {
-      id: '2',
-      sku: 'PWR-24V-10A',
-      product: 'Fuente de Alimentación 24V 10A',
-      type: 'SALIDA',
-      quantity: 35,
-      unit: 'uds',
-      location: 'Nave A (D-09-N3)',
-      targetOrSource: 'Distribuidora Andina S.A.S.',
-      referenceDoc: 'ORD-4410',
-      operator: 'Lucía Castro',
-      date: 'Hoy, 09:58 AM',
-      status: 'Completado'
-    },
-    {
-      id: '3',
-      sku: 'MOD-BLE-05',
-      product: 'Módulo Bluetooth 5.0 Low Energy',
-      type: 'TRASPASO',
-      quantity: 120,
-      unit: 'uds',
-      location: 'B-01 -> C-04',
-      targetOrSource: 'Transferencia Interna',
-      referenceDoc: 'TRP-1092',
-      operator: 'Esteban Gil',
-      date: 'Hoy, 09:15 AM',
-      status: 'En Tránsito'
-    },
-    {
-      id: '4',
-      sku: 'ALU-4040-2M',
-      product: 'Perfil Aluminio Estructural 40x40',
-      type: 'SALIDA',
-      quantity: 80,
-      unit: 'barras',
-      location: 'Nave B (F-01-N0)',
-      targetOrSource: 'Industrias Metalmecánicas',
-      referenceDoc: 'ORD-4409',
-      operator: 'Lucía Castro',
-      date: 'Hoy, 08:30 AM',
-      status: 'Completado'
-    },
-    {
-      id: '5',
-      sku: 'CON-M12-5P',
-      product: 'Conector Industrial M12 5-Pines',
-      type: 'ENTRADA',
-      quantity: 600,
-      unit: 'uds',
-      location: 'Nave C (Z-CUAR-01)',
-      targetOrSource: 'Electrónica Central S.A.',
-      referenceDoc: 'REC-2026-9780',
-      operator: 'Marcos Rivas',
-      date: 'Ayer, 18:20 PM',
-      status: 'En Verificación'
+  ngOnInit(): void {
+    this.loadRealData();
+  }
+
+  ngOnDestroy(): void {
+    this.salesSub?.unsubscribe();
+    this.productsSub?.unsubscribe();
+    this.clientsSub?.unsubscribe();
+  }
+
+  loadRealData(): void {
+    this.salesSub = this.saleService.sales$.subscribe((list) => {
+      this.ngZone.run(() => {
+        this.sales = [...(list || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.productsSub = this.productsService.products$.subscribe((list) => {
+      this.ngZone.run(() => {
+        this.products = [...(list || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.clientsSub = this.clientService.clients$.subscribe((list) => {
+      this.ngZone.run(() => {
+        this.clients = [...(list || [])];
+        if (this.clients.length > 0 && !this.orderForm.clientId) {
+          this.orderForm.clientId = this.clients[0].id;
+        }
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.saleService.getSales().subscribe();
+    this.productsService.getProducts().subscribe();
+    this.clientService.getClients().subscribe();
+  }
+
+  /**
+   * Transforma las ventas/pedidos de la base de datos en filas de movimientos.
+   * Si una orden tiene varios productos (Details), muestra cada producto con su estado:
+   * - isPaid === false -> PEDIDO (En Rojo)
+   * - isPaid === true  -> VENTA / Vendido (En Verde)
+   */
+  get movementRows(): MovementRow[] {
+    const rows: MovementRow[] = [];
+    for (const sale of this.sales) {
+      if (sale.details && sale.details.length > 0) {
+        for (const det of sale.details) {
+          const prod = this.products.find(p => p.id === det.productId || p.sku === det.productSku);
+          rows.push({
+            saleId: sale.id,
+            detailId: det.id,
+            productId: det.productId,
+            sku: det.productSku || prod?.sku || 'S/N',
+            productName: det.productName || prod?.name || 'Producto',
+            quantity: det.quantity,
+            unitPrice: det.unitPrice,
+            subtotal: det.subtotal,
+            totalSaleAmount: sale.totalAmount,
+            location: prod?.location || 'Almacén Central',
+            clientId: sale.clientId,
+            clientName: sale.clientName,
+            paymentMethod: sale.paymentMethod,
+            referenceDoc: sale.isPaid ? `VTA-${sale.id}` : `PED-${sale.id}`,
+            operator: sale.scheduledBy || 'Administrador',
+            createdAt: sale.createdAt,
+            isPaid: sale.isPaid,
+            typeLabel: sale.isPaid ? 'VENTA' : 'PEDIDO',
+            statusLabel: sale.isPaid ? 'Vendido' : 'Pedido'
+          });
+        }
+      } else {
+        rows.push({
+          saleId: sale.id,
+          detailId: 0,
+          productId: '',
+          sku: `ORD-${sale.id}`,
+          productName: `Orden #${sale.id}`,
+          quantity: sale.quantity,
+          unitPrice: sale.quantity > 0 ? sale.totalAmount / sale.quantity : sale.totalAmount,
+          subtotal: sale.totalAmount,
+          totalSaleAmount: sale.totalAmount,
+          location: 'Almacén Central',
+          clientId: sale.clientId,
+          clientName: sale.clientName,
+          paymentMethod: sale.paymentMethod,
+          referenceDoc: sale.isPaid ? `VTA-${sale.id}` : `PED-${sale.id}`,
+          operator: sale.scheduledBy || 'Administrador',
+          createdAt: sale.createdAt,
+          isPaid: sale.isPaid,
+          typeLabel: sale.isPaid ? 'VENTA' : 'PEDIDO',
+          statusLabel: sale.isPaid ? 'Vendido' : 'Pedido'
+        });
+      }
     }
-  ];
-
-  ngOnInit(): void {}
-
-  get totalEntries(): number {
-    return this.movements.filter(m => m.type === 'ENTRADA').length;
+    return rows;
   }
 
-  get totalExits(): number {
-    return this.movements.filter(m => m.type === 'SALIDA').length;
+  get totalSalesCount(): number {
+    return this.sales.filter(s => s.isPaid).length;
   }
 
-  get totalPending(): number {
-    return this.movements.filter(m => m.status === 'En Verificación' || m.status === 'En Tránsito').length;
+  get totalSalesRevenue(): number {
+    return this.sales.filter(s => s.isPaid).reduce((sum, s) => sum + (s.totalAmount || 0), 0);
   }
 
-  get filteredMovements(): MovementItem[] {
-    return this.movements.filter(m => {
-      const matchesTab = 
+  get totalOrdersCount(): number {
+    return this.sales.filter(s => !s.isPaid).length;
+  }
+
+  get totalOrdersPendingAmount(): number {
+    return this.sales.filter(s => !s.isPaid).reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+  }
+
+  get totalUnitsMoved(): number {
+    return this.sales.reduce((sum, s) => sum + (s.quantity || 0), 0);
+  }
+
+  get filteredMovements(): MovementRow[] {
+    return this.movementRows.filter(m => {
+      const matchesTab =
         this.activeTab === 'Todos' ||
-        (this.activeTab === 'Entradas' && m.type === 'ENTRADA') ||
-        (this.activeTab === 'Salidas' && m.type === 'SALIDA') ||
-        (this.activeTab === 'Traspasos' && m.type === 'TRASPASO');
+        (this.activeTab === 'Pedidos (Rojo)' && !m.isPaid) ||
+        (this.activeTab === 'Ventas (Verde)' && m.isPaid);
 
       const q = this.searchQuery.toLowerCase().trim();
-      const matchesSearch = 
+      const matchesSearch =
         !q ||
-        m.product.toLowerCase().includes(q) ||
+        m.productName.toLowerCase().includes(q) ||
         m.sku.toLowerCase().includes(q) ||
-        m.targetOrSource.toLowerCase().includes(q) ||
+        m.clientName.toLowerCase().includes(q) ||
         m.referenceDoc.toLowerCase().includes(q);
 
       return matchesTab && matchesSearch;
     });
   }
 
-  openEntryModal(): void {
-    this.showEntryModal = true;
+  formatPayMethod(method: string): string {
+    switch (method) {
+      case 'Cash': return 'Efectivo';
+      case 'BankTransfer': return 'Transferencia';
+      case 'CreditCard': return 'T. Crédito';
+      case 'DebitCard': return 'T. Débito';
+      default: return method || 'Efectivo';
+    }
   }
 
-  openExitModal(): void {
-    this.showExitModal = true;
+  openOrderModal(isPaid: boolean): void {
+    this.orderForm = {
+      clientId: this.clients.length > 0 ? this.clients[0].id : 0,
+      productId: this.products.length > 0 ? this.products[0].id : '',
+      quantity: 1,
+      paymentMethod: 'Cash',
+      isPaid
+    };
+    this.showOrderModal = true;
   }
 
   closeModals(): void {
-    this.showEntryModal = false;
-    this.showExitModal = false;
+    this.showOrderModal = false;
   }
 
-  saveEntry(): void {
-    if (!this.entryForm.product) return;
-
-    const newMovement: MovementItem = {
-      id: Date.now().toString(),
-      sku: 'SKU-' + Math.floor(1000 + Math.random() * 9000),
-      product: this.entryForm.product,
-      type: 'ENTRADA',
-      quantity: this.entryForm.quantity || 1,
-      unit: this.entryForm.unit,
-      location: this.entryForm.location || 'Nave Central',
-      targetOrSource: this.entryForm.provider || 'Proveedor Registrado',
-      referenceDoc: this.entryForm.doc || 'REC-' + Math.floor(1000 + Math.random() * 9000),
-      operator: 'Administrador Actual',
-      date: 'Hace un momento',
-      status: 'Completado'
+  openClientModal(): void {
+    this.clientForm = {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      password: ''
     };
-
-    this.movements.unshift(newMovement);
-    this.closeModals();
-    this.showNotification(`Entrada de "${this.entryForm.product}" registrada correctamente.`);
-    this.entryForm.product = '';
+    this.showClientModal = true;
   }
 
-  saveExit(): void {
-    if (!this.exitForm.product) return;
+  closeClientModal(): void {
+    this.showClientModal = false;
+  }
 
-    const newMovement: MovementItem = {
-      id: Date.now().toString(),
-      sku: 'SKU-' + Math.floor(1000 + Math.random() * 9000),
-      product: this.exitForm.product,
-      type: 'SALIDA',
-      quantity: this.exitForm.quantity || 1,
-      unit: this.exitForm.unit,
-      location: this.exitForm.location || 'Nave Central',
-      targetOrSource: this.exitForm.client || 'Cliente Corporativo',
-      referenceDoc: this.exitForm.doc || 'ORD-' + Math.floor(1000 + Math.random() * 9000),
-      operator: 'Administrador Actual',
-      date: 'Hace un momento',
-      status: 'Completado'
+  onProductSelectChange(): void {
+    this.cdr.detectChanges();
+  }
+
+  saveNewClient(): void {
+    if (!this.clientForm.firstName.trim() || !this.clientForm.lastName.trim() || !this.clientForm.email.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Datos incompletos',
+        text: 'Complete nombre, apellido y correo del cliente.'
+      });
+      return;
+    }
+
+    this.isCreatingClient = true;
+    this.clientService.createClient({
+      firstName: this.clientForm.firstName.trim(),
+      lastName: this.clientForm.lastName.trim(),
+      email: this.clientForm.email.trim(),
+      phone: this.clientForm.phone.trim() || '0000000000',
+      password: this.clientForm.password.trim() || 'Cliente123*'
+    }).subscribe({
+      next: (created) => {
+        this.isCreatingClient = false;
+        this.orderForm.clientId = created.id;
+        this.closeClientModal();
+        this.showNotification(`Cliente "${created.fullName}" registrado en la base de datos.`);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.isCreatingClient = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al crear cliente',
+          text: err?.error?.message || 'No se pudo registrar el cliente en la base de datos.'
+        });
+      }
+    });
+  }
+
+  saveOrderOrSale(): void {
+    if (!this.orderForm.clientId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Seleccione un cliente',
+        text: 'Debe seleccionar o crear un cliente antes de registrar el movimiento.'
+      });
+      return;
+    }
+
+    if (!this.orderForm.productId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Seleccione un producto',
+        text: 'Debe seleccionar un producto real del inventario.'
+      });
+      return;
+    }
+
+    if (!this.orderForm.quantity || this.orderForm.quantity < 1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cantidad inválida',
+        text: 'La cantidad debe ser al menos 1 unidad.'
+      });
+      return;
+    }
+
+    const payload: CreateSaleDto = {
+      clientId: Number(this.orderForm.clientId),
+      items: [
+        {
+          productId: this.orderForm.productId,
+          quantity: Number(this.orderForm.quantity)
+        }
+      ],
+      paymentMethod: this.orderForm.paymentMethod,
+      isPaid: this.orderForm.isPaid
     };
 
-    this.movements.unshift(newMovement);
-    this.closeModals();
-    this.showNotification(`Salida de "${this.exitForm.product}" registrada con éxito.`);
-    this.exitForm.product = '';
+    this.isSubmitting = true;
+    this.saleService.createSale(payload).subscribe({
+      next: (created) => {
+        this.isSubmitting = false;
+        this.closeModals();
+        const label = created.isPaid ? 'Venta (Verde - Vendido)' : 'Pedido (Rojo - Pendiente)';
+        this.showNotification(`${label} #${created.id} registrado en la base de datos.`);
+
+        if (created.stockAlerts && created.stockAlerts.length > 0) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Alerta Dinámica de Inventario',
+            html: created.stockAlerts.map(a => `<div style="margin-bottom:6px;">${a}</div>`).join(''),
+            confirmButtonColor: '#dc2626'
+          });
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'No se pudo registrar',
+          text: err?.error?.message || 'Verifique el stock disponible del producto en la base de datos.'
+        });
+      }
+    });
+  }
+
+  /**
+   * Cambia un Pedido en ROJO a Vendido en VERDE (o viceversa) en la base de datos.
+   */
+  onToggleSaleStatus(row: MovementRow): void {
+    this.togglingSaleId = row.saleId;
+    this.saleService.togglePaid(row.saleId).subscribe({
+      next: (updated) => {
+        this.togglingSaleId = null;
+        if (updated.isPaid) {
+          this.showNotification(`¡El Pedido #${updated.id} (${row.productName}) cambió a VENDIDO (Verde)!`);
+        } else {
+          this.showNotification(`La Venta #${updated.id} cambió nuevamente a PEDIDO pendiente (Rojo).`);
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.togglingSaleId = null;
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al actualizar estado',
+          text: err?.error?.message || 'No se pudo cambiar el estado en la base de datos.'
+        });
+      }
+    });
+  }
+
+  async onDeleteSale(row: MovementRow): Promise<void> {
+    const confirm = await Swal.fire({
+      title: `¿Eliminar ${row.isPaid ? 'Venta' : 'Pedido'} #${row.saleId}?`,
+      text: `Se devolverán ${row.quantity} unidades de "${row.productName}" al stock del inventario.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar y restaurar stock',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    this.saleService.deleteSale(row.saleId).subscribe({
+      next: () => {
+        this.showNotification(`Registro #${row.saleId} eliminado y stock restaurado en la base de datos.`);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al eliminar',
+          text: err?.error?.message || 'No se pudo eliminar el registro.'
+        });
+      }
+    });
   }
 
   private showNotification(msg: string): void {
     this.successMessage = msg;
     setTimeout(() => {
       this.successMessage = '';
-    }, 4000);
+      this.cdr.detectChanges();
+    }, 4500);
   }
 }

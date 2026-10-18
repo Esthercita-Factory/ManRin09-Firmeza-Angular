@@ -71,6 +71,7 @@ builder.Services.AddScoped<IEnterpriseRepository, EnterpriseRepository>();
 builder.Services.AddScoped<IClientRepository, ClientRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ISaleRepository, SaleRepository>();
 
 // Servicios de aplicación e infraestructura
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -80,6 +81,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
+builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddSingleton<IProductService, ProductService>();
 
 // Configuración de autenticación JWT (Esquema por defecto para API REST Angular)

@@ -93,4 +93,9 @@ public class Product
     public int StockTotal => Stock;
     public int StockAvailable => Math.Max(0, Stock - StockReserved);
     public string LastMovement { get; set; } = "Reciente";
+
+    public bool IsLowStock => StockAvailable <= MinStock || StockAvailable < 5;
+    public bool IsOutOfStock => StockAvailable <= 0;
+    public string StockStatus => StockAvailable <= 0 ? "AGOTADO" : (IsLowStock ? "STOCK CRÍTICO" : (StockAvailable <= 20 ? "ESTABLE" : "ÓPTIMO"));
+    public string StockStatusClass => IsLowStock ? "critical" : (StockAvailable <= 20 ? "stable" : "optimal");
 }

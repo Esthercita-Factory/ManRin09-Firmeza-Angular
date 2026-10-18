@@ -149,7 +149,7 @@ interface BatchExpiryItem {
         </div>
 
         <!-- KPI 3: Alertas de Stock Bajo -->
-        <div class="kpi-card red-kpi">
+        <div class="kpi-card red-kpi" (click)="filterByLowStock()" style="cursor: pointer;" title="Filtrar productos con stock crítico/bajo">
           <div class="kpi-top-row">
             <span class="kpi-label red-lbl">ALERTAS DE STOCK BAJO</span>
             <div class="kpi-icon-box red-tint">
@@ -166,7 +166,7 @@ interface BatchExpiryItem {
           </div>
           <div class="kpi-footer-row">
             <span class="alert-urgent" *ngIf="lowStockCount > 0">
-              <strong>!</strong> Requiere O/C urgente
+              <strong>!</strong> {{ selectedStockLevel === 'STOCK CRÍTICO' ? 'Mostrando sólo críticos' : 'Clic para filtrar en tabla' }}
             </span>
             <span class="rot-text" *ngIf="lowStockCount === 0">
               Stock en niveles óptimos
@@ -200,29 +200,24 @@ interface BatchExpiryItem {
           <div class="filter-dropdown-wrapper">
             <select [(ngModel)]="selectedCategory" class="filter-dropdown">
               <option value="all">Categoría: Todas</option>
-              <option value="Construcción">Construcción</option>
-              <option value="Fijaciones">Fijaciones</option>
-              <option value="Químicos">Químicos y Selladores</option>
-              <option value="Herramientas">Herramientas</option>
+              <option *ngFor="let cat of availableCategories" [value]="cat">{{ cat }}</option>
             </select>
           </div>
 
           <div class="filter-dropdown-wrapper">
             <select [(ngModel)]="selectedLocation" class="filter-dropdown">
               <option value="all">Ubicación: Todas las Naves</option>
-              <option value="Nave A">Nave A</option>
-              <option value="Nave B">Nave B</option>
-              <option value="Nave C">Nave C</option>
-              <option value="Bahía Fría">Bahía Fría</option>
+              <option *ngFor="let loc of availableLocations" [value]="loc">{{ loc }}</option>
             </select>
           </div>
 
           <div class="filter-dropdown-wrapper">
             <select [(ngModel)]="selectedStockLevel" class="filter-dropdown">
               <option value="all">Estado: Todos los niveles</option>
-              <option value="ÓPTIMO">Óptimo</option>
-              <option value="STOCK CRÍTICO">Crítico</option>
+              <option value="STOCK CRÍTICO">Crítico / Stock Bajo</option>
+              <option value="AGOTADO">Agotado (0 unidades)</option>
               <option value="ESTABLE">Estable</option>
+              <option value="ÓPTIMO">Óptimo</option>
             </select>
           </div>
         </div>
@@ -1591,11 +1586,68 @@ export class InventoryComponent implements OnInit, OnDestroy {
     return item.id || item.sku;
   }
 
+  get availableCategories(): string[] {
+    const set = new Set<string>();
+    for (const p of this.products) {
+      if (p.category && p.category.trim()) {
+        set.add(p.category.trim());
+      }
+    }
+    return Array.from(set).sort();
+  }
+
+  get availableLocations(): string[] {
+    const set = new Set<string>();
+    for (const p of this.products) {
+      if (p.location && p.location.trim()) {
+        set.add(p.location.trim());
+      }
+    }
+    return Array.from(set).sort();
+  }
+
+  filterByLowStock(): void {
+    if (this.selectedStockLevel === 'STOCK CRÍTICO') {
+      this.selectedStockLevel = 'all';
+    } else {
+      this.selectedStockLevel = 'STOCK CRÍTICO';
+    }
+    this.cdr.detectChanges();
+  }
+
+  private updateReplenishmentQueue(): void {
+    this.replenishmentQueue = this.products
+      .filter(p => this.isUnderFive(p))
+      .map(p => {
+        const qty = this.getStockQuantity(p);
+        const min = p.minStock ?? 5;
+        const targetOrder = Math.max(min * 2 - qty, min);
+        const percent = min > 0 ? Math.min(100, Math.round((qty / min) * 100)) : 0;
+        const isStockout = qty <= 0;
+
+        return {
+          percent,
+          percentClass: isStockout ? 'red' : (percent <= 50 ? 'pink' : 'blue'),
+          name: p.name,
+          sku: p.sku,
+          statusNote: isStockout 
+            ? '¡QUIEBRE TOTAL! 0 unidades disponibles' 
+            : `Stock Crítico: ${qty} uds disponibles (Mínimo: ${min})`,
+          isTotalStockout: isStockout,
+          min,
+          order: targetOrder,
+          buttonText: isStockout ? 'Urgente' : 'Emitir PO',
+          buttonClass: isStockout ? 'red-urgent' : 'blue-po'
+        };
+      });
+  }
+
   loadProducts(): void {
     console.log('[Inventario] Conectando suscripción en tiempo real...');
     this.productsSub = this.productsService.products$.subscribe((items) => {
       this.ngZone.run(() => {
         this.products = [...(items || [])];
+        this.updateReplenishmentQueue();
         this.cdr.detectChanges();
       });
     });
@@ -1604,6 +1656,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       next: (data) => {
         this.ngZone.run(() => {
           this.products = [...(data || [])];
+          this.updateReplenishmentQueue();
           this.cdr.detectChanges();
         });
       },
@@ -1616,19 +1669,32 @@ export class InventoryComponent implements OnInit, OnDestroy {
 
   isUnderFive(item: ProductItem): boolean {
     const qty = this.getStockQuantity(item);
-    return qty < 5 || item.stockStatusClass === 'critical' || item.stockStatus === 'STOCK CRÍTICO';
+    const min = item.minStock ?? 5;
+    return qty <= min || qty < 5 || item.stockStatusClass === 'critical' || item.stockStatus === 'STOCK CRÍTICO' || item.stockStatus === 'AGOTADO';
   }
 
   get filteredProducts(): ProductItem[] {
     return this.products.filter(item => {
-      const matchesSearch = !this.searchQuery.trim() || 
-        item.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        item.sku.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        item.barcode.includes(this.searchQuery);
+      const q = this.searchQuery.trim().toLowerCase();
+      const matchesSearch = !q || 
+        item.name.toLowerCase().includes(q) ||
+        item.sku.toLowerCase().includes(q) ||
+        (item.barcode && item.barcode.toLowerCase().includes(q));
 
-      const matchesCategory = this.selectedCategory === 'all' || item.category.includes(this.selectedCategory);
-      const matchesLocation = this.selectedLocation === 'all' || item.location.includes(this.selectedLocation);
-      const matchesStockLevel = this.selectedStockLevel === 'all' || item.stockStatus === this.selectedStockLevel;
+      const matchesCategory = this.selectedCategory === 'all' || 
+        item.category.toLowerCase() === this.selectedCategory.toLowerCase();
+
+      const matchesLocation = this.selectedLocation === 'all' || 
+        item.location.toLowerCase() === this.selectedLocation.toLowerCase();
+
+      let matchesStockLevel = true;
+      if (this.selectedStockLevel === 'STOCK CRÍTICO') {
+        matchesStockLevel = this.isUnderFive(item);
+      } else if (this.selectedStockLevel === 'AGOTADO') {
+        matchesStockLevel = this.getStockQuantity(item) <= 0;
+      } else if (this.selectedStockLevel !== 'all') {
+        matchesStockLevel = item.stockStatus === this.selectedStockLevel;
+      }
 
       return matchesSearch && matchesCategory && matchesLocation && matchesStockLevel;
     });

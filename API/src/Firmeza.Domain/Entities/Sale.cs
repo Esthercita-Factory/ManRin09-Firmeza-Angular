@@ -38,9 +38,9 @@ public class Sale
     public string PaymentMethod { get; set; } = string.Empty;
 
     /// <summary>
-    /// Estado actual de la venta (ej: Pendiente, Completada, Cancelada).
+    /// Estado actual de la venta (Pagada, Pendiente, Devuelta, etc).
     /// </summary>
-    public string Status { get; set; } = string.Empty;
+    public bool IsPaid { get; set; }
 
     /// <summary>
     /// Identificación o nombre de la persona/usuario que agendó la venta.
@@ -51,4 +51,9 @@ public class Sale
     /// Fecha y hora en la que se registró o agendó la venta.
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Colección de productos y renglones incluidos en esta venta (1:N).
+    /// </summary>
+    public ICollection<SaleDetail> Details { get; set; } = new List<SaleDetail>();
 }

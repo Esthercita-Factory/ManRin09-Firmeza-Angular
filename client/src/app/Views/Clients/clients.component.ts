@@ -1,17 +1,13 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ClientService, ClientDto } from '../../Services/client.service';
+import { SaleService, SaleDto } from '../../Services/sale.service';
+import { ProductsService, ProductItem } from '../../Services/products.service';
 
-export interface ClientItem {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  isActive: boolean;
-  createdAt: string;
-}
+export type ClientItem = ClientDto;
 
 interface ProductCatalogItem {
   id: string;
@@ -32,7 +28,7 @@ interface ProductCatalogItem {
 @Component({
   selector: 'app-clients',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="fz-viewport">
       <!-- 1. Barra Superior del Portal Omnicanal -->
@@ -58,12 +54,9 @@ interface ProductCatalogItem {
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
             <div class="store-info">
-              <span class="store-lbl">Sucursal Activa:</span>
-              <span class="store-val">Sucursal Central - Bodega Naucalpan</span>
+              <span class="store-lbl">Base de Datos Activa:</span>
+              <span class="store-val">{{ clients.length }} Clientes Registrados</span>
             </div>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
           </div>
         </div>
 
@@ -76,7 +69,7 @@ interface ProductCatalogItem {
             <input 
               type="text" 
               [(ngModel)]="globalSearchQuery" 
-              placeholder="Buscar por ticket, folio, SKU..." 
+              placeholder="Buscar por cliente, folio, SKU..." 
               class="portal-search-input"
             />
           </div>
@@ -90,10 +83,10 @@ interface ProductCatalogItem {
             </svg>
             <div class="corp-details">
               <div class="corp-header-row">
-                <span class="corp-name">Logística Altiplano S.A.</span>
-                <span class="corp-tag">CORP</span>
+                <span class="corp-name">{{ activeClient ? activeClient.fullName : 'Sin clientes registrados' }}</span>
+                <span class="corp-tag">BD</span>
               </div>
-              <span class="corp-rut">CLIENTE VIP TOP 1 • RUT: 76.432.890-K</span>
+              <span class="corp-rut">{{ activeClient ? activeClient.email : '0 clientes en base de datos' }}</span>
             </div>
           </div>
         </div>
@@ -110,147 +103,106 @@ interface ProductCatalogItem {
         </button>
       </nav>
 
-      <!-- 2. Tarjeta Principal de Bienvenida y Métricas de Cuenta -->
+      <!-- 2. Tarjeta Principal de Bienvenida y Métricas de Cuenta (Datos Reales o 0) -->
       <section class="welcome-card">
         <div class="welcome-top">
           <div class="client-identity">
             <div class="auth-pill">
               <span class="dot-green"></span>
-              <span>CUENTA CORPORATIVA AUTENTICADA • ID #CL-98420-MX</span>
+              <span>CONECTADO A /api/clients Y /api/sale • {{ clients.length }} CLIENTES</span>
             </div>
-            <h1 class="client-greeting">Hola, Arq. Roberto Gómez</h1>
+            <h1 class="client-greeting">
+              {{ activeClient ? ('Cliente: ' + activeClient.fullName) : 'Clientes Registrados: 0' }}
+            </h1>
             <div class="client-enterprise-info">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
                 <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-                <line x1="9" y1="22" x2="9" y2="22.01"></line>
-                <line x1="15" y1="22" x2="15" y2="22.01"></line>
-                <line x1="9" y1="6" x2="9" y2="6.01"></line>
-                <line x1="15" y1="6" x2="15" y2="6.01"></line>
-                <line x1="9" y1="10" x2="9" y2="10.01"></line>
-                <line x1="15" y1="10" x2="15" y2="10.01"></line>
-                <line x1="9" y1="14" x2="9" y2="14.01"></line>
-                <line x1="15" y1="14" x2="15" y2="14.01"></line>
-                <line x1="9" y1="18" x2="9" y2="18.01"></line>
-                <line x1="15" y1="18" x2="15" y2="18.01"></line>
               </svg>
-              <span>Ferretería & Construcción Del Norte S.A. de C.V. • Sucursal Vinculada: <strong>Naucalpan Industrial</strong></span>
+              <span *ngIf="activeClient">Correo: <strong>{{ activeClient.email }}</strong> • Teléfono: <strong>{{ activeClient.phone || 'N/A' }}</strong></span>
+              <span *ngIf="!activeClient">No hay clientes registrados aún en la base de datos.</span>
             </div>
           </div>
 
           <div class="welcome-quick-actions">
-            <button class="btn-welcome-outline">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-              <span>Tickets de Caja Físicos</span>
-            </button>
-
-            <button class="btn-welcome-outline">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="1" y="3" width="15" height="13"></rect>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                <circle cx="18.5" cy="18.5" r="2.5"></circle>
-              </svg>
-              <span>Rastrear Envíos</span>
-            </button>
-
-            <button class="btn-welcome-primary">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-              <span>Reordenar 1-Clic</span>
-            </button>
+            <a routerLink="/app/enterprises" class="btn-welcome-primary" style="text-decoration: none;">
+              <span>Ir a Movimientos y Pedidos →</span>
+            </a>
           </div>
         </div>
 
-        <!-- 4 Métricas de Resumen del Cliente -->
+        <!-- 4 Métricas de Resumen del Cliente (0 si no hay datos en BD) -->
         <div class="metrics-grid">
-          <!-- Métrica 1: Facturación Este Mes -->
+          <!-- Métrica 1: Facturación Total -->
           <div class="metric-card">
             <div class="metric-header">
-              <span class="metric-title">Facturación Este Mes</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+              <span class="metric-title">Facturación Ventas (Verde)</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2">
                 <rect x="2" y="5" width="20" height="14" rx="2"></rect>
                 <line x1="2" y1="10" x2="22" y2="10"></line>
               </svg>
             </div>
             <div class="metric-value">
-              <span>$42,650.00</span>
-              <span class="metric-unit">MXN</span>
+              <span style="color: #16a34a;">\${{ totalPaidRevenue | number:'1.2-2' }}</span>
             </div>
             <div class="metric-caption text-green">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="18 15 12 9 6 15"></polyline>
-              </svg>
-              <span>+14.8% vs mes previo</span>
+              <span>{{ paidSalesCount }} ventas cobradas en BD</span>
             </div>
           </div>
 
-          <!-- Métrica 2: En Tienda Física (POS) -->
+          <!-- Métrica 2: Pedidos Pendientes (Rojo) -->
           <div class="metric-card">
             <div class="metric-header">
-              <span class="metric-title">En Tienda Física (POS)</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-              </svg>
-            </div>
-            <div class="metric-value">
-              <span>8 Tickets</span>
-            </div>
-            <div class="metric-caption text-muted">
-              <span>Sincronizados en Naucalpan y Tlalnepantla</span>
-            </div>
-          </div>
-
-          <!-- Métrica 3: Pedidos Online Activos -->
-          <div class="metric-card">
-            <div class="metric-header">
-              <span class="metric-title">Pedidos Online Activos</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </div>
-            <div class="metric-value">
-              <span>3 En Tránsito / Hub</span>
-            </div>
-            <div class="metric-caption text-blue">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <span class="metric-title">Pedidos Pendientes (Rojo)</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
-              <span>1 Entrega programada hoy</span>
+            </div>
+            <div class="metric-value">
+              <span style="color: #dc2626;">{{ pendingOrdersCount }} Pedidos</span>
+            </div>
+            <div class="metric-caption" style="color: #dc2626; font-weight: 600;">
+              <span>\${{ totalPendingAmount | number:'1.2-2' }} pendientes de pago</span>
             </div>
           </div>
 
-          <!-- Métrica 4: Puntos Firmeza Pro -->
+          <!-- Métrica 3: Total Clientes en BD -->
           <div class="metric-card">
             <div class="metric-header">
-              <span class="metric-title">Puntos Firmeza Pro</span>
+              <span class="metric-title">Clientes en Base de Datos</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                <circle cx="12" cy="8" r="7"></circle>
+                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+              </svg>
+            </div>
+            <div class="metric-value">
+              <span>{{ clients.length }} Clientes</span>
+            </div>
+            <div class="metric-caption text-blue">
+              <span>{{ activeClientsCount }} clientes activos</span>
+            </div>
+          </div>
+
+          <!-- Métrica 4: Unidades Adquiridas -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Total Unidades Movilizadas</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
               </svg>
             </div>
             <div class="metric-value">
-              <span>3,420</span>
-              <span class="metric-unit">PTS DISPONIBLES</span>
+              <span>{{ totalUnitsPurchased | number }}</span>
+              <span class="metric-unit">UDS</span>
             </div>
-            <div class="metric-caption">
-              <a href="javascript:void(0)" class="link-pts">Canjear $1,250 MXN de crédito →</a>
+            <div class="metric-caption text-muted">
+              <span>En {{ sales.length }} órdenes registradas</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 3. Sección: Mis Compras Omnicanal -->
+      <!-- 3. Sección: Mis Compras y Pedidos Reales en Base de Datos -->
       <section class="purchases-section">
         <div class="section-header-row">
           <div>
@@ -260,9 +212,9 @@ interface ProductCatalogItem {
                 <path d="M3 12h18"></path>
                 <path d="m17 8 4 4-4 4"></path>
               </svg>
-              <span>FLUJO UNIFICADO DE SUMINISTROS</span>
+              <span>HISTORIAL REAL DESDE /api/sale</span>
             </div>
-            <h2 class="section-title">Mis Compras Omnicanal (Tienda Física y Online)</h2>
+            <h2 class="section-title">Pedidos (Rojo) y Ventas (Verde) Registrados</h2>
           </div>
 
           <div class="purchases-search">
@@ -273,7 +225,7 @@ interface ProductCatalogItem {
             <input 
               type="text" 
               [(ngModel)]="purchaseFilterText" 
-              placeholder="Filtrar por ticket, folio, SKU..." 
+              placeholder="Filtrar por cliente, folio, SKU..." 
               class="table-search-input"
             />
           </div>
@@ -282,267 +234,70 @@ interface ProductCatalogItem {
         <!-- Filtros de Compra -->
         <div class="purchases-filter-tabs">
           <button 
-            *ngFor="let tab of purchaseTabs" 
-            [class.active]="selectedPurchaseTab === tab.id"
-            (click)="selectedPurchaseTab = tab.id" 
+            [class.active]="selectedPurchaseTab === 'all'"
+            (click)="selectedPurchaseTab = 'all'" 
             class="purchase-tab-btn">
-            {{ tab.label }}
+            Todos ({{ sales.length }})
+          </button>
+          <button 
+            [class.active]="selectedPurchaseTab === 'orders'"
+            (click)="selectedPurchaseTab = 'orders'" 
+            class="purchase-tab-btn">
+            Pedidos en Rojo ({{ pendingOrdersCount }})
+          </button>
+          <button 
+            [class.active]="selectedPurchaseTab === 'sales'"
+            (click)="selectedPurchaseTab = 'sales'" 
+            class="purchase-tab-btn">
+            Ventas en Verde ({{ paidSalesCount }})
           </button>
         </div>
 
-        <!-- Tarjetas de Órdenes Omnicanal -->
+        <!-- Tarjetas de Órdenes Reales desde Base de Datos -->
         <div class="orders-list">
-          <!-- ORDEN 1: Tienda Física / Mostrador -->
-          <div class="order-card" *ngIf="selectedPurchaseTab === 'all' || selectedPurchaseTab === 'pos'">
+          <div *ngIf="filteredSalesList.length === 0" style="padding: 2rem; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 8px;">
+            0 pedidos o ventas registrados en la base de datos.
+          </div>
+
+          <div
+            class="order-card"
+            *ngFor="let s of filteredSalesList"
+            [style.border-left]="s.isPaid ? '4px solid #16a34a' : '4px solid #dc2626'"
+          >
             <div class="order-card-header">
               <div class="order-type-badge">
-                <span class="badge-dot-blue"></span>
-                <strong>ADQUIRIDO EN MOSTRADOR / TIENDA FÍSICA</strong>
-                <span class="order-code">Ticket #TCK-89211</span>
-                <span class="order-date">• Hace 2 días (24 Oct 2024, 11:26 hrs)</span>
+                <span [style.background]="s.isPaid ? '#16a34a' : '#dc2626'" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                <strong [style.color]="s.isPaid ? '#15803d' : '#dc2626'">
+                  {{ s.isPaid ? 'VENTA COMPLETADA (VENDIDO)' : 'PEDIDO PENDIENTE' }}
+                </strong>
+                <span class="order-code">#{{ s.isPaid ? 'VTA' : 'PED' }}-{{ s.id }}</span>
+                <span class="order-date">• {{ s.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
               </div>
               <div class="order-location-tag">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                </svg>
-                <span>Sucursal Naucalpan Industrial • Terminal Caja 04 • Cajero: L. Mendoza</span>
+                <span>Cliente: <strong>{{ s.clientName }}</strong> • Registrado por: {{ s.scheduledBy }}</span>
               </div>
             </div>
 
-            <div class="order-items-row">
-              <div class="mini-product-card">
-                <div class="mini-product-thumb aluminum-box">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8">
-                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                    <line x1="3" y1="9" x2="21" y2="9"></line>
-                    <line x1="3" y1="15" x2="21" y2="15"></line>
-                    <line x1="9" y1="3" x2="9" y2="21"></line>
-                    <line x1="15" y1="3" x2="15" y2="21"></line>
-                  </svg>
-                </div>
+            <div class="order-items-row" *ngIf="s.details && s.details.length > 0">
+              <div class="mini-product-card" *ngFor="let det of s.details">
                 <div class="mini-product-details">
-                  <span class="mp-title">Perfil Aluminio 40x40 T-Slot</span>
-                  <span class="mp-sku">SKU: ALU-4040-6M • 8 Barras (6m)</span>
-                  <span class="mp-price">$3,920.00 MXN</span>
-                </div>
-              </div>
-
-              <div class="mini-product-card">
-                <div class="mini-product-thumb connector-box">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8">
-                    <circle cx="12" cy="12" r="7"></circle>
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <line x1="12" y1="2" x2="12" y2="5"></line>
-                    <line x1="12" y1="19" x2="12" y2="22"></line>
-                  </svg>
-                </div>
-                <div class="mini-product-details">
-                  <span class="mp-title">Conector Industrial M12 Macho IP67</span>
-                  <span class="mp-sku">SKU: CN-M12-5P • 50 piezas</span>
-                  <span class="mp-price">$2,450.00 MXN</span>
-                </div>
-              </div>
-
-              <div class="mini-product-card">
-                <div class="mini-product-thumb cable-box">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="1.8">
-                    <circle cx="12" cy="12" r="9"></circle>
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                  </svg>
-                </div>
-                <div class="mini-product-details">
-                  <span class="mp-title">Cable Blindado Apantallado 4x0.75</span>
-                  <span class="mp-sku">SKU: CBL-SH-4075 • 1 Bobina (100m)</span>
-                  <span class="mp-price">$1,890.00 MXN</span>
+                  <span class="mp-title">{{ det.productName }}</span>
+                  <span class="mp-sku">SKU: {{ det.productSku }} • {{ det.quantity }} uds x \${{ det.unitPrice | number:'1.2-2' }}</span>
+                  <span class="mp-price" [style.color]="s.isPaid ? '#15803d' : '#dc2626'">\${{ det.subtotal | number:'1.2-2' }}</span>
                 </div>
               </div>
             </div>
 
             <div class="order-card-footer">
               <div class="order-payment-info">
-                <span class="pay-lbl">Total Abonado en Caja:</span>
-                <span class="pay-amount">$8,260.00 MXN</span>
-                <span class="pay-method">| Pago con Tarjeta Santander Corp. ****4502</span>
+                <span class="pay-lbl">Monto Total ({{ s.quantity }} uds):</span>
+                <span class="pay-amount" [style.color]="s.isPaid ? '#15803d' : '#dc2626'">\${{ s.totalAmount | number:'1.2-2' }}</span>
+                <span class="pay-method">| Método: {{ s.paymentMethod }}</span>
               </div>
               <div class="order-footer-actions">
-                <button class="btn-ticket-link">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                  </svg>
-                  <span>Ver Ticket Digital / CFDI 4.0</span>
-                </button>
-                <button class="btn-repurchase-blue">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                  </svg>
-                  <span>Volver a Comprar Online</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- ORDEN 2: Pedido Web En Ruta -->
-          <div class="order-card" *ngIf="selectedPurchaseTab === 'all' || selectedPurchaseTab === 'online'">
-            <div class="order-card-header">
-              <div class="order-type-badge">
-                <span class="badge-dot-blue"></span>
-                <strong>PEDIDO WEB • EN RUTA DE ENTREGA</strong>
-                <span class="order-code">Folio #FMZ-98421</span>
-                <span class="order-date">• Generado hoy 08:15 hrs</span>
-              </div>
-              <div class="order-location-tag">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                  <rect x="1" y="3" width="15" height="13"></rect>
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                </svg>
-                <span>ETA Estimada: Hoy 16:30 hrs • Unidad Móvil #F-14</span>
-              </div>
-            </div>
-
-            <!-- Línea de Progreso de Envío -->
-            <div class="tracking-progress-bar">
-              <div class="track-step done">
-                <div class="step-point">✓</div>
-                <div class="step-texts">
-                  <span class="step-title">1. CONFIRMADO</span>
-                  <span class="step-sub">08:15 hrs</span>
-                </div>
-              </div>
-              <div class="track-connector done"></div>
-              <div class="track-step done">
-                <div class="step-point">✓</div>
-                <div class="step-texts">
-                  <span class="step-title">2. PREPARADO</span>
-                  <span class="step-sub">Almacén Central 11:00</span>
-                </div>
-              </div>
-              <div class="track-connector active"></div>
-              <div class="track-step active">
-                <div class="step-point pulse">3</div>
-                <div class="step-texts">
-                  <span class="step-title">3. EN REPARTO</span>
-                  <span class="step-sub">Circuito Periférico Norte</span>
-                </div>
-              </div>
-              <div class="track-connector"></div>
-              <div class="track-step upcoming">
-                <div class="step-point">4</div>
-                <div class="step-texts">
-                  <span class="step-title">4. ENTREGA EN OBRA</span>
-                  <span class="step-sub">Parque Industrial Barrientos</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Producto y Acciones -->
-            <div class="order-items-delivery">
-              <div class="delivery-item-info">
-                <div class="mini-product-thumb vfd-box">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.8">
-                    <rect x="4" y="2" width="16" height="20" rx="2"></rect>
-                    <rect x="7" y="5" width="10" height="4"></rect>
-                    <circle cx="12" cy="15" r="3"></circle>
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="delivery-item-name">Variador de Frecuencia 9.5 HP 380V Trifásico</h3>
-                  <span class="delivery-item-sku">SKU: VFD-IND-55HP • 2 Unidades</span>
-                  <span class="delivery-item-price">$21,800.00 MXN</span>
-                </div>
-              </div>
-
-              <div class="delivery-actions">
-                <button class="btn-delivery-outline">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-                    <line x1="8" y1="2" x2="8" y2="18"></line>
-                    <line x1="16" y1="6" x2="16" y2="22"></line>
-                  </svg>
-                  <span>Rastrear en Vivo</span>
-                </button>
-                <button class="btn-delivery-outline">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                  </svg>
-                  <span>Detalle y Guía</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- ORDEN 3: Click & Collect (Casillero Inteligente) -->
-          <div class="order-card" *ngIf="selectedPurchaseTab === 'all' || selectedPurchaseTab === 'lockers'">
-            <div class="order-card-header">
-              <div class="order-type-badge">
-                <span class="badge-dot-purple"></span>
-                <strong>CLICK & COLLECT • LISTO PARA RECOJO</strong>
-                <span class="order-code">Retiro #RST-4412</span>
-              </div>
-            </div>
-
-            <div class="locker-layout">
-              <div class="locker-details">
-                <h3 class="locker-hub-title">Sucursal Tlalnepantla Hub • Casillero Automatizado #12</h3>
-                <p class="locker-instruction">
-                  Tu paquete ya fue depositado en el locker inteligente de la sucursal. Puedes retirar las 24 horas del día sin hacer fila en el mostrador mostrando el código QR adjunto.
-                </p>
-                <div class="locker-item-card">
-                  <div class="mini-product-thumb tool-box">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.8">
-                      <polygon points="6 2 18 2 18 6 6 6"></polygon>
-                      <polygon points="8 6 16 6 12 22"></polygon>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 class="lic-name">Juego Brocas Titanio Escalonadas M35 HSS (Pack x3)</h4>
-                    <span class="lic-sub">SKU: BRO-HSS-03 • $1,190.00 MXN</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tarjeta de Código QR y PIN -->
-              <div class="qr-code-card">
-                <span class="qr-heading">ESCANEAR EN CASILLERO</span>
-                <div class="qr-visual">
-                  <svg width="105" height="105" viewBox="0 0 100 100" fill="#0f172a">
-                    <!-- Cuadros esquinas QR -->
-                    <rect x="5" y="5" width="30" height="30" rx="3" fill="#0f172a"></rect>
-                    <rect x="10" y="10" width="20" height="20" rx="2" fill="#ffffff"></rect>
-                    <rect x="15" y="15" width="10" height="10" rx="1" fill="#0f172a"></rect>
-
-                    <rect x="65" y="5" width="30" height="30" rx="3" fill="#0f172a"></rect>
-                    <rect x="70" y="10" width="20" height="20" rx="2" fill="#ffffff"></rect>
-                    <rect x="75" y="15" width="10" height="10" rx="1" fill="#0f172a"></rect>
-
-                    <rect x="5" y="65" width="30" height="30" rx="3" fill="#0f172a"></rect>
-                    <rect x="10" y="70" width="20" height="20" rx="2" fill="#ffffff"></rect>
-                    <rect x="15" y="75" width="10" height="10" rx="1" fill="#0f172a"></rect>
-
-                    <!-- Patrón interno QR -->
-                    <rect x="42" y="10" width="8" height="8"></rect>
-                    <rect x="48" y="24" width="8" height="8"></rect>
-                    <rect x="10" y="44" width="8" height="8"></rect>
-                    <rect x="25" y="44" width="8" height="8"></rect>
-                    <rect x="42" y="42" width="16" height="16"></rect>
-                    <rect x="68" y="44" width="8" height="8"></rect>
-                    <rect x="82" y="50" width="8" height="8"></rect>
-                    <rect x="42" y="70" width="8" height="18"></rect>
-                    <rect x="56" y="70" width="8" height="8"></rect>
-                    <rect x="74" y="74" width="16" height="8"></rect>
-                  </svg>
-                </div>
-                <div class="pin-display">
-                  <span class="pin-lbl">PIN:</span>
-                  <span class="pin-code">840-291</span>
-                </div>
-                <span class="qr-validity">Vigencia: 72 horas restantes</span>
+                <a routerLink="/app/enterprises" class="btn-repurchase-blue" style="text-decoration: none;">
+                  <span>Gestionar en Movimientos y Pedidos</span>
+                </a>
               </div>
             </div>
           </div>
@@ -2237,8 +1992,16 @@ interface ProductCatalogItem {
     }
   `]
 })
-export class ClientsComponent implements OnInit {
-  private readonly http = inject(HttpClient);
+export class ClientsComponent implements OnInit, OnDestroy {
+  private readonly clientService = inject(ClientService);
+  private readonly saleService = inject(SaleService);
+  private readonly productsService = inject(ProductsService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private clientsSub?: Subscription;
+  private salesSub?: Subscription;
+  private productsSub?: Subscription;
 
   globalSearchQuery = '';
   purchaseFilterText = '';
@@ -2253,29 +2016,71 @@ export class ClientsComponent implements OnInit {
   ];
   activeNavTab = 'Mis Compras (Tienda & Online)';
 
-  purchaseTabs = [
-    { id: 'all', label: 'Todas las compras (11)' },
-    { id: 'pos', label: 'En Tienda Física / Mostrador (6)' },
-    { id: 'online', label: 'Pedidos Online / Reparto a Obra (2)' },
-    { id: 'lockers', label: 'Retiro en Casillero / Click & Collect (1)' }
-  ];
   selectedPurchaseTab = 'all';
 
   catalogCategories = [
     'Todos los Suministros',
-    'Sensores y Automatización',
-    'Perfiles de Aluminio Modulares',
-    'Herramientas Neumáticas',
-    'Fuentes & Control 24V',
-    'Transmisión y Rodamientos'
+    'Construcción',
+    'Fijaciones',
+    'Químicos',
+    'Herramientas'
   ];
   selectedCategory = 'Todos los Suministros';
 
+  clients: ClientDto[] = [];
+  sales: SaleDto[] = [];
   products: ProductCatalogItem[] = [];
+  loading = false;
+
+  get activeClient(): ClientDto | null {
+    return this.clients.length > 0 ? this.clients[0] : null;
+  }
+
+  get activeClientsCount(): number {
+    return this.clients.filter(c => c.isActive).length;
+  }
+
+  get paidSalesCount(): number {
+    return this.sales.filter(s => s.isPaid).length;
+  }
+
+  get pendingOrdersCount(): number {
+    return this.sales.filter(s => !s.isPaid).length;
+  }
+
+  get totalPaidRevenue(): number {
+    return this.sales.filter(s => s.isPaid).reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }
+
+  get totalPendingAmount(): number {
+    return this.sales.filter(s => !s.isPaid).reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }
+
+  get totalUnitsPurchased(): number {
+    return this.sales.reduce((acc, s) => acc + (s.quantity || 0), 0);
+  }
+
+  get filteredSalesList(): SaleDto[] {
+    return this.sales.filter(s => {
+      const matchTab =
+        this.selectedPurchaseTab === 'all' ||
+        (this.selectedPurchaseTab === 'orders' && !s.isPaid) ||
+        (this.selectedPurchaseTab === 'sales' && s.isPaid);
+
+      const q = (this.purchaseFilterText || this.globalSearchQuery).toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        s.clientName.toLowerCase().includes(q) ||
+        String(s.id).includes(q) ||
+        (s.details && s.details.some(d => d.productName.toLowerCase().includes(q) || d.productSku.toLowerCase().includes(q)));
+
+      return matchTab && matchSearch;
+    });
+  }
 
   get filteredProducts(): ProductCatalogItem[] {
     return this.products.filter(p => {
-      const matchCat = this.selectedCategory === 'Todos los Suministros' || p.category === this.selectedCategory;
+      const matchCat = this.selectedCategory === 'Todos los Suministros' || p.category.toLowerCase().includes(this.selectedCategory.toLowerCase());
       const matchSearch = !this.globalSearchQuery.trim() || 
         p.name.toLowerCase().includes(this.globalSearchQuery.toLowerCase()) ||
         p.sku.toLowerCase().includes(this.globalSearchQuery.toLowerCase());
@@ -2283,23 +2088,54 @@ export class ClientsComponent implements OnInit {
     });
   }
 
-  // Clientes traídos desde la base de datos
-  clients: ClientItem[] = [];
-  loading = false;
-
   ngOnInit(): void {
-    console.log('[Clientes] Solicitando clientes desde la base de datos...');
-    this.http.get<ClientItem[]>('http://localhost:5235/api/Clients').subscribe({
-      next: (data) => {
-        if (data) {
-          this.clients = data;
-          console.log('[Clientes] Clientes cargados desde BD:', data);
-        }
-      },
-      error: (err) => {
-        console.warn('[Clientes] Error o sin conexión con API de clientes:', err);
-      }
+    this.clientsSub = this.clientService.clients$.subscribe(list => {
+      this.ngZone.run(() => {
+        this.clients = [...(list || [])];
+        this.cdr.detectChanges();
+      });
     });
+
+    this.salesSub = this.saleService.sales$.subscribe(list => {
+      this.ngZone.run(() => {
+        this.sales = [...(list || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.productsSub = this.productsService.products$.subscribe(list => {
+      this.ngZone.run(() => {
+        this.products = (list || []).map(p => this.mapProductToCatalog(p));
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.clientService.getClients().subscribe();
+    this.saleService.getSales().subscribe();
+    this.productsService.getProducts().subscribe();
+  }
+
+  ngOnDestroy(): void {
+    this.clientsSub?.unsubscribe();
+    this.salesSub?.unsubscribe();
+    this.productsSub?.unsubscribe();
+  }
+
+  private mapProductToCatalog(p: ProductItem): ProductCatalogItem {
+    const rawPrice = parseFloat(String(p.salePrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    return {
+      id: p.id,
+      sku: p.sku,
+      brand: p.category,
+      name: p.name,
+      price: rawPrice,
+      priceUnit: 'c/u',
+      bulkInfo: `Ubicación: ${p.location}`,
+      stockText: `${p.stockAvailable} disp.`,
+      quantity: 1,
+      category: p.category,
+      svgType: 'sensor'
+    };
   }
 
   increaseQty(prod: ProductCatalogItem): void {
@@ -2310,7 +2146,5 @@ export class ClientsComponent implements OnInit {
     if (prod.quantity > 1) prod.quantity--;
   }
 
-  addToCart(prod: ProductCatalogItem): void {
-    // Feedback de añadir al carrito
-  }
+  addToCart(prod: ProductCatalogItem): void {}
 }

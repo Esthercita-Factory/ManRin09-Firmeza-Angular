@@ -1,5 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import { ProductsService, ProductItem } from '../../Services/products.service';
+import { SaleService, SaleDto } from '../../Services/sale.service';
 
 interface ScheduledReport {
   id: string;
@@ -20,10 +24,22 @@ interface CategoryValue {
   barColor: string;
 }
 
+interface DynamicsBarPoint {
+  label: string;
+  subLabel: string;
+  inboundCount: number;
+  outboundCount: number;
+  inboundH: number;
+  inboundY: number;
+  outboundH: number;
+  outboundY: number;
+  x: number;
+}
+
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="fz-viewport">
       <!-- 1. Encabezado de Navegación y Acciones -->
@@ -43,18 +59,27 @@ interface CategoryValue {
         </div>
 
         <div class="header-actions">
-          <!-- Selector de rango de fechas -->
-          <div class="date-selector-btn">
+          <!-- Selector interactivo de rango y lapsos de fecha -->
+          <div class="date-selector-btn" style="gap: 0.6rem;">
             <svg class="action-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
               <line x1="3" y1="10" x2="21" y2="10"></line>
             </svg>
-            <span class="date-range-text">Últimos 30 días: 1 Oct - 31 Oct 2024</span>
-            <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
+            <select [(ngModel)]="selectedLapse" (change)="onLapseChange()" class="reports-lapse-select">
+              <option value="today">Hoy</option>
+              <option value="7d">Últimos 7 días</option>
+              <option value="30d">Últimos 30 días</option>
+              <option value="all">Todo el Historial</option>
+              <option value="custom">Rango Personalizado</option>
+            </select>
+            <div *ngIf="selectedLapse === 'custom'" style="display: flex; align-items: center; gap: 0.35rem;">
+              <input type="date" [(ngModel)]="startDate" (change)="onDateRangeChange()" class="reports-date-input" />
+              <span style="font-size: 0.72rem; color: #64748b;">al</span>
+              <input type="date" [(ngModel)]="endDate" (change)="onDateRangeChange()" class="reports-date-input" />
+            </div>
+            <span *ngIf="selectedLapse !== 'custom'" class="date-range-text">{{ lapseLabel }}</span>
           </div>
 
           <!-- Botón de Exportar Informe Ejecutivo -->
@@ -72,109 +97,116 @@ interface CategoryValue {
         </div>
       </header>
 
-      <!-- 2. Tarjetas KPI de Rendimiento Operativo (4 Cards) -->
+      <!-- 2. Tarjetas KPI de Rendimiento Operativo (0 cuando no hay datos en BD) -->
       <section class="kpi-grid">
-        <!-- KPI 1: Tasa de Rotación -->
-        <div class="kpi-card">
+        <!-- KPI 1: Inversión en Inventario (Costo de Compra) -->
+        <div class="kpi-card" style="border-left: 4px solid #2563eb;">
           <div class="kpi-header">
-            <span class="kpi-title">TASA ROTACIÓN INVENTARIO</span>
-            <button class="kpi-icon-btn" title="Actualizar métrica">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="kpi-value-row">
-            <span class="kpi-number">8.4x</span>
-          </div>
-          <div class="kpi-footer">
-            <span class="kpi-badge badge-blue">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="18 15 12 9 6 15"></polyline>
-              </svg>
-              +1.2 vs trim. ant.
-            </span>
-            <span class="kpi-meta">Meta anclada: 7.5x</span>
-          </div>
-        </div>
-
-        <!-- KPI 2: Precisión de Pedidos -->
-        <div class="kpi-card">
-          <div class="kpi-header">
-            <span class="kpi-title">PRECISIÓN DE PEDIDOS</span>
-            <div class="kpi-icon-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                <polyline points="9 12 11 14 15 10"></polyline>
+            <span class="kpi-title" style="color: #2563eb;">DINERO EN INVENTARIO (COSTO)</span>
+            <div class="kpi-icon-pill" style="background: #eff6ff; color: #2563eb;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
               </svg>
             </div>
           </div>
           <div class="kpi-value-row">
-            <span class="kpi-number">99.2%</span>
+            <span class="kpi-number">\${{ totalInventoryCost | number:'1.2-2' }}</span>
           </div>
           <div class="kpi-footer">
-            <span class="kpi-badge badge-neutral">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              Meta: 99.0%
+            <span class="kpi-badge badge-blue">
+              {{ totalStockUnits | number }} uds en stock
             </span>
-            <span class="kpi-meta">Error: 0.08%</span>
+            <span class="kpi-meta">Capital invertido</span>
           </div>
         </div>
 
-        <!-- KPI 3: Tiempo Promedio Picking -->
+        <!-- KPI 2: Ganancia Estimada Potencial (Margen Bruto) -->
+        <div class="kpi-card" style="border-left: 4px solid #16a34a;">
+          <div class="kpi-header">
+            <span class="kpi-title" style="color: #16a34a;">GANANCIA POTENCIAL (BENEFICIO)</span>
+            <div class="kpi-icon-pill" style="background: #dcfce7; color: #16a34a;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number" style="color: #15803d;">\${{ totalPotentialProfit | number:'1.2-2' }}</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge" style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;">
+              +{{ profitMarginPercent }}% margen estimado
+            </span>
+            <span class="kpi-meta">Venta menos Costo</span>
+          </div>
+        </div>
+
+        <!-- KPI 3: Valor Total de Venta del Inventario -->
         <div class="kpi-card">
           <div class="kpi-header">
-            <span class="kpi-title">TIEMPO PROMEDIO PICKING</span>
+            <span class="kpi-title">VALOR TOTAL DE VENTA (PVP)</span>
             <div class="kpi-icon-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.2">
+                <path d="M3 3v18h18"></path>
+                <path d="M18 17V9"></path>
+                <path d="M13 17V5"></path>
+                <path d="M8 17v-3"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number">\${{ totalInventorySaleValue | number:'1.2-2' }}</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge badge-neutral">
+              {{ products.length }} SKUs activos
+            </span>
+            <span class="kpi-meta">Si se vende todo</span>
+          </div>
+        </div>
+
+        <!-- KPI 4: Ventas Realizadas (Cobradas en Verde) -->
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-title">INGRESOS COBRADOS (VERDE)</span>
+            <div class="kpi-icon-pill" style="background: #dcfce7; color: #16a34a;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number" style="color: #15803d;">\${{ totalSalesRevenue | number:'1.2-2' }}</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge badge-blue">
+              {{ paidSalesCount }} ventas realizadas
+            </span>
+            <span class="kpi-meta">Cobrado en BD</span>
+          </div>
+        </div>
+
+        <!-- KPI 5: Pedidos Pendientes (Por Cobrar en Rojo) -->
+        <div class="kpi-card" style="border-left: 4px solid #dc2626;">
+          <div class="kpi-header">
+            <span class="kpi-title" style="color: #dc2626;">PEDIDOS PENDIENTES (ROJO)</span>
+            <div class="kpi-icon-pill" style="background: #fee2e2; color: #dc2626;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
             </div>
           </div>
           <div class="kpi-value-row">
-            <span class="kpi-number">14.5<span class="kpi-unit">min</span></span>
+            <span class="kpi-number" style="color: #dc2626;">\${{ pendingOrdersAmount | number:'1.2-2' }}</span>
           </div>
           <div class="kpi-footer">
-            <span class="kpi-badge badge-blue">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-              -3.2 min optimizado
+            <span class="kpi-badge" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">
+              {{ pendingOrdersCount }} pedidos por cobrar
             </span>
-            <span class="kpi-meta">Lote mediano</span>
-          </div>
-        </div>
-
-        <!-- KPI 4: Costo Retención Stock -->
-        <div class="kpi-card">
-          <div class="kpi-header">
-            <span class="kpi-title">COSTO RETENCIÓN STOCK</span>
-            <div class="kpi-icon-pill">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                <line x1="6" y1="8" x2="6" y2="8"></line>
-                <line x1="10" y1="8" x2="10" y2="8"></line>
-                <line x1="14" y1="8" x2="18" y2="8"></line>
-                <line x1="6" y1="12" x2="18" y2="12"></line>
-                <line x1="6" y1="16" x2="18" y2="16"></line>
-              </svg>
-            </div>
-          </div>
-          <div class="kpi-value-row">
-            <span class="kpi-number">$18,450<span class="kpi-unit">/mes</span></span>
-          </div>
-          <div class="kpi-footer">
-            <span class="kpi-badge badge-neutral-dark">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-              -6.8% mensual
-            </span>
-            <span class="kpi-meta">Ocupación 87%</span>
+            <span class="kpi-meta">Pendiente</span>
           </div>
         </div>
       </section>
@@ -200,7 +232,7 @@ interface CategoryValue {
             </div>
           </div>
 
-          <!-- Gráfica visual SVG con curva de tendencia y barras duales -->
+          <!-- Gráfica visual SVG con datos reales de la base de datos según el lapso de fechas -->
           <div class="chart-canvas-container">
             <svg class="dynamics-svg" viewBox="0 0 680 230" preserveAspectRatio="none">
               <defs>
@@ -218,73 +250,45 @@ interface CategoryValue {
                 </linearGradient>
               </defs>
 
-              <!-- Área sombreada bajo la curva de tendencia -->
-              <path 
-                d="M 68 120 C 130 110, 150 100, 200 95 C 260 90, 280 125, 335 115 C 380 105, 410 75, 465 65 C 520 55, 550 62, 600 58 L 600 195 L 68 195 Z" 
-                fill="url(#areaGradient)" 
-              />
-
-              <!-- Línea punteada de tendencia superior -->
-              <path 
-                d="M 68 120 C 130 110, 150 100, 200 95 C 260 90, 280 125, 335 115 C 380 105, 410 75, 465 65 C 520 55, 550 62, 600 58" 
-                fill="none" 
-                stroke="#2563eb" 
-                stroke-width="2.5" 
-                stroke-dasharray="4 4" 
-              />
-
-              <!-- Puntos de referencia sobre la línea -->
-              <circle cx="68" cy="120" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
-              <circle cx="200" cy="95" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
-              <circle cx="335" cy="115" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
-              <circle cx="465" cy="65" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
-              <circle cx="600" cy="58" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+              <!-- Curva de tendencia dinámica calculada -->
+              <path *ngIf="dynamicsChartAreaPath" [attr.d]="dynamicsChartAreaPath" fill="url(#areaGradient)" />
+              <path *ngIf="dynamicsChartLinePath" [attr.d]="dynamicsChartLinePath" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="4 4" />
 
               <!-- LÍNEA BASE HORIZONTAL -->
               <line x1="30" y1="195" x2="650" y2="195" stroke="#f1f5f9" stroke-width="1.5" />
 
-              <!-- BARRAS SEMANA 40 (01-07 Oct) -->
-              <rect x="58" y="120" width="16" height="75" rx="3" fill="url(#barInboundGrad)" class="chart-bar" />
-              <rect x="78" y="138" width="16" height="57" rx="3" fill="url(#barOutboundGrad)" class="chart-bar" />
-
-              <!-- BARRAS SEMANA 41 (08-14 Oct) -->
-              <rect x="190" y="95" width="16" height="100" rx="3" fill="url(#barInboundGrad)" class="chart-bar" />
-              <rect x="210" y="110" width="16" height="85" rx="3" fill="url(#barOutboundGrad)" class="chart-bar" />
-
-              <!-- BARRAS SEMANA 42 (15-21 Oct) -->
-              <rect x="325" y="115" width="16" height="80" rx="3" fill="url(#barInboundGrad)" class="chart-bar" />
-              <rect x="345" y="125" width="16" height="70" rx="3" fill="url(#barOutboundGrad)" class="chart-bar" />
-
-              <!-- BARRAS SEMANA 43 (22-28 Oct) -->
-              <rect x="455" y="65" width="16" height="130" rx="3" fill="url(#barInboundGrad)" class="chart-bar" />
-              <rect x="475" y="80" width="16" height="115" rx="3" fill="url(#barOutboundGrad)" class="chart-bar" />
-
-              <!-- BARRAS SEMANA 44 (29-31 Oct) -->
-              <rect x="590" y="58" width="16" height="137" rx="3" fill="url(#barInboundGrad)" class="chart-bar" />
-              <rect x="610" y="75" width="16" height="120" rx="3" fill="url(#barOutboundGrad)" class="chart-bar" />
+              <!-- Barras duales dinámicas de la BD -->
+              <g *ngFor="let pt of dynamicsPoints">
+                <!-- Entradas / Inbound -->
+                <rect 
+                  [attr.x]="pt.x - 12" 
+                  [attr.y]="pt.inboundY" 
+                  width="14" 
+                  [attr.height]="pt.inboundH" 
+                  rx="3" 
+                  fill="url(#barInboundGrad)" 
+                  class="chart-bar">
+                  <title>{{ pt.label }} ({{ pt.subLabel }}): {{ pt.inboundCount }} entradas registradas</title>
+                </rect>
+                <!-- Salidas / Outbound -->
+                <rect 
+                  [attr.x]="pt.x + 4" 
+                  [attr.y]="pt.outboundY" 
+                  width="14" 
+                  [attr.height]="pt.outboundH" 
+                  rx="3" 
+                  fill="url(#barOutboundGrad)" 
+                  class="chart-bar">
+                  <title>{{ pt.label }} ({{ pt.subLabel }}): {{ pt.outboundCount }} salidas / ventas</title>
+                </rect>
+              </g>
             </svg>
 
-            <!-- Etiquetas de Semanas en el eje X -->
+            <!-- Etiquetas dinámicas del eje X -->
             <div class="chart-x-labels">
-              <div class="x-label-item">
-                <span class="x-week">Sem 40</span>
-                <span class="x-dates">(01-07 Oct)</span>
-              </div>
-              <div class="x-label-item">
-                <span class="x-week">Sem 41</span>
-                <span class="x-dates">(08-14 Oct)</span>
-              </div>
-              <div class="x-label-item">
-                <span class="x-week">Sem 42</span>
-                <span class="x-dates">(15-21 Oct)</span>
-              </div>
-              <div class="x-label-item">
-                <span class="x-week">Sem 43</span>
-                <span class="x-dates">(22-28 Oct)</span>
-              </div>
-              <div class="x-label-item">
-                <span class="x-week">Sem 44</span>
-                <span class="x-dates">(29-31 Oct)</span>
+              <div class="x-label-item" *ngFor="let pt of dynamicsPoints">
+                <span class="x-week">{{ pt.label }}</span>
+                <span class="x-dates">({{ pt.subLabel }})</span>
               </div>
             </div>
           </div>
@@ -331,9 +335,9 @@ interface CategoryValue {
             </div>
             <div class="custody-content">
               <span class="custody-label">VALOR TOTAL CUSTODIADO</span>
-              <div class="custody-value">$2,951,400 USD</div>
+              <div class="custody-value">\${{ totalInventoryValue | number:'1.2-2' }}</div>
               <a href="javascript:void(0)" class="custody-status-link">
-                Auditoría ciclo cerrada
+                {{ products.length }} SKUs en Base de Datos
               </a>
             </div>
           </div>
@@ -357,7 +361,7 @@ interface CategoryValue {
               <h2 class="abc-title">Matriz de Clasificación ABC de Inventario</h2>
             </div>
           </div>
-          <span class="abc-rebalance-text">Frecuencia de rebalanceo: Semanal</span>
+          <span class="abc-rebalance-text">Total SKUs: {{ products.length }}</span>
         </div>
 
         <!-- Barra Continua Segmentada 80% / 15% / 5% -->
@@ -375,7 +379,7 @@ interface CategoryValue {
               <span class="class-badge badge-clase-a">CLASE A</span>
               <span class="class-value-bold">80% Valor Total</span>
             </div>
-            <h3 class="class-headline">20% de SKUs Totales (412 artículos)</h3>
+            <h3 class="class-headline">SKUs Totales: {{ products.length }} artículos</h3>
             <p class="class-desc">
               Alta criticidad. Artículos motrices de facturación y proyectos clave de infraestructura.
             </p>
@@ -393,7 +397,7 @@ interface CategoryValue {
               <span class="class-badge badge-clase-b">CLASE B</span>
               <span class="class-value-bold">15% Valor Total</span>
             </div>
-            <h3 class="class-headline">30% de SKUs Totales (618 artículos)</h3>
+            <h3 class="class-headline">Pedidos Pendientes: {{ pendingOrdersCount }} órdenes</h3>
             <p class="class-desc">
               Impacto intermedio. Consumo regular predecible en operaciones de taller y mantenimiento.
             </p>
@@ -411,7 +415,7 @@ interface CategoryValue {
               <span class="class-badge badge-clase-c">CLASE C</span>
               <span class="class-value-bold">5% Valor Total</span>
             </div>
-            <h3 class="class-headline">50% de SKUs Totales (1,030 artículos)</h3>
+            <h3 class="class-headline">Ventas Completadas: {{ paidSalesCount }} ventas</h3>
             <p class="class-desc">
               Baja rotación y costo marginal unitario. Elementos fungibles y consumibles auxiliares.
             </p>
@@ -632,6 +636,30 @@ interface CategoryValue {
       box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
     }
 
+    .reports-lapse-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #1e293b;
+      background: #f8fafc;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .reports-date-input {
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #334155;
+      outline: none;
+      font-family: inherit;
+    }
+
     .action-icon {
       color: #2563eb;
     }
@@ -669,21 +697,29 @@ interface CategoryValue {
     /* 2. KPI Cards Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.15rem;
     }
 
-    @media (max-width: 1200px) {
+    @media (max-width: 1400px) {
+      .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 900px) {
       .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
       }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 600px) {
       .kpi-grid {
         grid-template-columns: 1fr;
       }
     }
+
+
 
     .kpi-card {
       background: #ffffff;
@@ -1536,27 +1572,292 @@ interface CategoryValue {
     }
   `]
 })
-export class ReportsComponent {
-  categories: CategoryValue[] = [];
+export class ReportsComponent implements OnInit, OnDestroy {
+  private readonly productsService = inject(ProductsService);
+  private readonly saleService = inject(SaleService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  private productsSub?: Subscription;
+  private salesSub?: Subscription;
+
+  products: ProductItem[] = [];
+  sales: SaleDto[] = [];
   scheduledReports: ScheduledReport[] = [];
 
-  constructor() {
-    console.log('[Reportes] Inicializando vista de reportes sin datos quemados.');
+  // Filtro de lapso de fechas
+  selectedLapse: 'today' | '7d' | '30d' | 'all' | 'custom' = '30d';
+  startDate: string = '';
+  endDate: string = '';
+
+  get lapseLabel(): string {
+    switch (this.selectedLapse) {
+      case 'today': return 'Ventas y movimientos de Hoy';
+      case '7d': return 'Últimos 7 días';
+      case '30d': return 'Últimos 30 días';
+      case 'all': return 'Todo el historial en BD';
+      default: return `${this.startDate || ''} - ${this.endDate || ''}`;
+    }
   }
 
-  exportExecutiveReport(): void {
-    alert('Generando Informe Ejecutivo Consolidado (PDF/Excel)... Descarga en curso.');
+  onLapseChange(): void {
+    if (this.selectedLapse === 'custom' && !this.startDate) {
+      const d = new Date();
+      this.endDate = d.toISOString().substring(0, 10);
+      d.setDate(d.getDate() - 30);
+      this.startDate = d.toISOString().substring(0, 10);
+    }
+    this.cdr.detectChanges();
   }
 
-  configureRoutines(): void {
-    alert('Configuración de Rutinas Batch de Auditoría: Frecuencias automáticas sincronizadas con S3.');
+  onDateRangeChange(): void {
+    this.cdr.detectChanges();
   }
 
-  downloadReport(report: ScheduledReport): void {
-    alert(`Descargando entregable: ${report.name} (${report.format} - ${report.size})`);
+  // Filtrado de ventas por el lapso de tiempo seleccionado
+  get filteredSalesByDate(): SaleDto[] {
+    if (this.selectedLapse === 'all') {
+      return this.sales;
+    }
+    const todayStr = new Date().toISOString().substring(0, 10);
+    if (this.selectedLapse === 'today') {
+      return this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) === todayStr);
+    }
+    if (this.selectedLapse === '7d' || this.selectedLapse === '30d') {
+      const days = this.selectedLapse === '7d' ? 7 : 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().substring(0, 10);
+      return this.sales.filter(s => s.createdAt && s.createdAt.substring(0, 10) >= cutoffStr);
+    }
+    if (this.selectedLapse === 'custom') {
+      return this.sales.filter(s => {
+        if (!s.createdAt) return false;
+        const d = s.createdAt.substring(0, 10);
+        const matchStart = !this.startDate || d >= this.startDate;
+        const matchEnd = !this.endDate || d <= this.endDate;
+        return matchStart && matchEnd;
+      });
+    }
+    return this.sales;
   }
 
-  viewS3Repository(): void {
-    alert('Redirigiendo a bucket de almacenamiento corporativo S3: s3://firmeza-ims-audits/reports-2024/');
+  // Puntos dinámicos para la gráfica de Movimientos de Entrada vs Salida
+  get dynamicsPoints(): DynamicsBarPoint[] {
+    const points: DynamicsBarPoint[] = [];
+    const salesList = this.filteredSalesByDate;
+
+    // Agrupar en 5 intervalos para renderizar la gráfica de 5 semanas / tramos
+    const intervalsCount = 5;
+    const stepX = 530 / Math.max(1, intervalsCount - 1);
+
+    // Calcular totales por bloque
+    let numDays = this.selectedLapse === '7d' ? 7 : (this.selectedLapse === '30d' ? 30 : 30);
+    if (this.selectedLapse === 'today') numDays = 1;
+
+    // Mapear por fecha
+    const dayMap = new Map<string, { inbound: number; outbound: number }>();
+    for (const s of salesList) {
+      if (!s.createdAt) continue;
+      const key = s.createdAt.substring(0, 10);
+      const cur = dayMap.get(key) || { inbound: 0, outbound: 0 };
+      if (s.isPaid) {
+        cur.outbound += (s.quantity || 1);
+      } else {
+        cur.inbound += (s.quantity || 1);
+      }
+      dayMap.set(key, cur);
+    }
+
+    let maxVal = 1;
+    for (const v of dayMap.values()) {
+      maxVal = Math.max(maxVal, v.inbound, v.outbound);
+    }
+
+    // Si no hay ventas, mostramos los 5 bloques con valores en 0
+    const now = new Date();
+    for (let i = 0; i < intervalsCount; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - ((intervalsCount - 1 - i) * 6));
+      const iso = d.toISOString().substring(0, 10);
+      const data = dayMap.get(iso) || { inbound: 0, outbound: 0 };
+
+      // Alturas escaladas hasta 140px máximo
+      const inboundH = data.inbound > 0 ? Math.max(10, Math.round((data.inbound / maxVal) * 120)) : 0;
+      const outboundH = data.outbound > 0 ? Math.max(10, Math.round((data.outbound / maxVal) * 120)) : 0;
+      const inboundY = 195 - inboundH;
+      const outboundY = 195 - outboundH;
+      const x = 68 + (i * stepX);
+
+      points.push({
+        label: `Intervalo ${i + 1}`,
+        subLabel: `${d.getDate()}/${d.getMonth() + 1}`,
+        inboundCount: data.inbound,
+        outboundCount: data.outbound,
+        inboundH,
+        inboundY,
+        outboundH,
+        outboundY,
+        x
+      });
+    }
+
+    return points;
   }
+
+  get dynamicsChartAreaPath(): string {
+    if (this.dynamicsPoints.length < 2) return '';
+    let d = `M ${this.dynamicsPoints[0].x} ${this.dynamicsPoints[0].outboundY}`;
+    for (let i = 1; i < this.dynamicsPoints.length; i++) {
+      const prev = this.dynamicsPoints[i - 1];
+      const cur = this.dynamicsPoints[i];
+      const cx = (prev.x + cur.x) / 2;
+      d += ` C ${cx} ${prev.outboundY}, ${cx} ${cur.outboundY}, ${cur.x} ${cur.outboundY}`;
+    }
+    const last = this.dynamicsPoints[this.dynamicsPoints.length - 1];
+    d += ` L ${last.x} 195 L ${this.dynamicsPoints[0].x} 195 Z`;
+    return d;
+  }
+
+  get dynamicsChartLinePath(): string {
+    if (this.dynamicsPoints.length < 2) return '';
+    let d = `M ${this.dynamicsPoints[0].x} ${this.dynamicsPoints[0].outboundY}`;
+    for (let i = 1; i < this.dynamicsPoints.length; i++) {
+      const prev = this.dynamicsPoints[i - 1];
+      const cur = this.dynamicsPoints[i];
+      const cx = (prev.x + cur.x) / 2;
+      d += ` C ${cx} ${prev.outboundY}, ${cx} ${cur.outboundY}, ${cur.x} ${cur.outboundY}`;
+    }
+    return d;
+  }
+
+  private getStockNum(p: ProductItem): number {
+    const raw = String(p.stockAvailable || p.stockTotal || '0').replace(/[^0-9-]/g, '');
+    const n = parseInt(raw, 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  private parsePrice(val: any): number {
+    if (val === undefined || val === null || val === '') return 0;
+    const str = String(val).replace(/[^0-9.]/g, '');
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+  }
+
+  get totalStockUnits(): number {
+    return this.products.reduce((acc, p) => acc + this.getStockNum(p), 0);
+  }
+
+  // Dinero invertido en inventario (a precio de costo de adquisición)
+  get totalInventoryCost(): number {
+    return this.products.reduce((acc, p) => {
+      const qty = this.getStockNum(p);
+      const cost = this.parsePrice(p.costPrice);
+      return acc + (qty * cost);
+    }, 0);
+  }
+
+  // Valor total de venta si se vende todo el inventario (a precio de venta al público PVP)
+  get totalInventorySaleValue(): number {
+    return this.products.reduce((acc, p) => {
+      const qty = this.getStockNum(p);
+      const sale = this.parsePrice(p.salePrice);
+      return acc + (qty * sale);
+    }, 0);
+  }
+
+  // Ganancia potencial total (Valor Venta Total - Costo Total Invertido)
+  get totalPotentialProfit(): number {
+    return Math.max(0, this.totalInventorySaleValue - this.totalInventoryCost);
+  }
+
+  // Porcentaje de margen de ganancia estimado
+  get profitMarginPercent(): number {
+    if (this.totalInventoryCost <= 0) {
+      return this.totalInventorySaleValue > 0 ? 100 : 0;
+    }
+    return Math.round((this.totalPotentialProfit / this.totalInventoryCost) * 100);
+  }
+
+  get totalInventoryValue(): number {
+    return this.totalInventorySaleValue;
+  }
+
+  get criticalCount(): number {
+    return this.products.filter(p => this.getStockNum(p) < 5).length;
+  }
+
+  // Métricas que responden al filtro de fechas
+  get paidSalesCount(): number {
+    return this.filteredSalesByDate.filter(s => s.isPaid).length;
+  }
+
+  get totalSalesRevenue(): number {
+    return this.filteredSalesByDate.filter(s => s.isPaid).reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }
+
+  get pendingOrdersCount(): number {
+    return this.filteredSalesByDate.filter(s => !s.isPaid).length;
+  }
+
+  get pendingOrdersAmount(): number {
+    return this.filteredSalesByDate.filter(s => !s.isPaid).reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }
+
+  get categories(): CategoryValue[] {
+    if (this.products.length === 0) return [];
+    const totalVal = this.totalInventoryValue || 1;
+    const mapCat = new Map<string, number>();
+    for (const p of this.products) {
+      const qty = this.getStockNum(p);
+      const price = parseFloat(String(p.costPrice || p.salePrice || '0').replace(/[^0-9.]/g, '')) || 0;
+      const val = qty * price;
+      mapCat.set(p.category, (mapCat.get(p.category) || 0) + val);
+    }
+    const colors = ['#2563eb', '#0284c7', '#16a34a', '#d97706', '#9333ea'];
+    let idx = 0;
+    const res: CategoryValue[] = [];
+    for (const [name, val] of mapCat.entries()) {
+      res.push({
+        name,
+        percentage: Math.round((val / totalVal) * 100),
+        amount: `$${val.toFixed(2)}`,
+        barColor: colors[idx % colors.length]
+      });
+      idx++;
+    }
+    return res;
+  }
+
+  ngOnInit(): void {
+    this.productsSub = this.productsService.products$.subscribe(list => {
+      this.ngZone.run(() => {
+        this.products = [...(list || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.salesSub = this.saleService.sales$.subscribe(list => {
+      this.ngZone.run(() => {
+        this.sales = [...(list || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.productsService.getProducts().subscribe();
+    this.saleService.getSales().subscribe();
+  }
+
+  ngOnDestroy(): void {
+    this.productsSub?.unsubscribe();
+    this.salesSub?.unsubscribe();
+  }
+
+  exportExecutiveReport(): void {}
+
+  configureRoutines(): void {}
+
+  downloadReport(report: ScheduledReport): void {}
+
+  viewS3Repository(): void {}
 }

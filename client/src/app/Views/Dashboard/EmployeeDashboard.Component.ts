@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../Services/auth.service';
 import { ProductsService, ProductItem } from '../../Services/products.service';
+import { SaleService, SaleDto } from '../../Services/sale.service';
 
 interface AssignedTask {
   code: string;
@@ -151,21 +152,21 @@ interface ScheduledProvider {
                       [class.active]="activeTab === 'all'" 
                       (click)="setTab('all')"
                     >
-                      Todos (5)
+                      Todos ({{ tasksList.length }})
                     </button>
                     <button 
                       class="segment-btn" 
                       [class.active]="activeTab === 'picking'" 
                       (click)="setTab('picking')"
                     >
-                      Picking (2)
+                      Pedidos ({{ pendingOrdersCount }})
                     </button>
                     <button 
                       class="segment-btn" 
                       [class.active]="activeTab === 'recepciones'" 
                       (click)="setTab('recepciones')"
                     >
-                      Recepciones (2)
+                      Ventas ({{ paidSalesCount }})
                     </button>
                   </div>
                 </div>
@@ -211,14 +212,14 @@ interface ScheduledProvider {
                           </span>
                         </td>
                         <td class="text-right">
-                          <button class="btn-op-action" [ngClass]="item.actionClass">
-                            <svg *ngIf="item.hasPrintIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
-                              <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                              <rect x="6" y="14" width="12" height="8"></rect>
-                            </svg>
+                          <a routerLink="/app/enterprises" class="btn-op-action" [ngClass]="item.actionClass" style="text-decoration: none; display: inline-flex; align-items: center;">
                             {{ item.actionText }}
-                          </button>
+                          </a>
+                        </td>
+                      </tr>
+                      <tr *ngIf="filteredTasks.length === 0">
+                        <td colspan="6" style="text-align: center; padding: 1.5rem; color: #64748b;">
+                          No hay órdenes ni movimientos registrados en la base de datos (0 asignaciones).
                         </td>
                       </tr>
                     </tbody>
@@ -226,7 +227,7 @@ interface ScheduledProvider {
                 </div>
 
                 <div class="panel-footer-row">
-                  <span class="footer-count">Mostrando 4 de 5 asignaciones directas</span>
+                  <span class="footer-count">Mostrando {{ filteredTasks.length }} de {{ tasksList.length }} órdenes en base de datos</span>
                   <a routerLink="/app/enterprises" class="footer-link">
                     Ver todos en Movimientos y Pedidos
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -262,7 +263,7 @@ interface ScheduledProvider {
                     <p class="tool-desc">Busca existencias en tiempo real por SKU, lote o descripción.</p>
                     
                     <div class="tool-search-input">
-                      <input type="text" placeholder="Ej. PER-IPE-200 o es..." [(ngModel)]="stockSearchInput" />
+                      <input type="text" placeholder="Buscar por SKU o nombre..." [(ngModel)]="stockSearchInput" />
                       <button class="qr-btn" title="Escanear con lector">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <rect x="3" y="3" width="7" height="7"></rect>
@@ -292,7 +293,7 @@ interface ScheduledProvider {
                     </div>
 
                     <div class="tool-footer">
-                      <span class="tool-count">{{ products.length > 0 ? (products.length | number) : '5' }} SKUs en catálogo</span>
+                      <span class="tool-count">{{ products.length | number }} SKUs en catálogo</span>
                       <span class="tool-tag-ok">API OK</span>
                     </div>
                   </div>
@@ -308,18 +309,17 @@ interface ScheduledProvider {
                         </svg>
                       </div>
                       <span class="tool-title">Alertas Bahía Nave A</span>
-                      <span class="badge-critical ms-auto">3 CRÍTICOS</span>
+                      <span class="badge-critical ms-auto">{{ criticalProducts.length }} CRÍTICOS</span>
                     </div>
                     <p class="tool-desc">Existencias por debajo del umbral mínimo de seguridad:</p>
 
                     <div class="critical-items-list">
-                      <div class="critical-item">
-                        <span>Viga IPE...</span>
-                        <span class="crit-qty"><strong class="text-danger">4 uds</strong> / min 20</span>
+                      <div *ngIf="criticalProducts.length === 0" style="font-size: 0.74rem; color: #64748b; padding: 0.5rem 0;">
+                        0 productos en estado crítico.
                       </div>
-                      <div class="critical-item">
-                        <span>Perno...</span>
-                        <span class="crit-qty"><strong class="text-danger">120 uds</strong> / min 500</span>
+                      <div *ngFor="let cp of criticalProducts.slice(0, 3)" class="critical-item">
+                        <span>{{ cp.name }}</span>
+                        <span class="crit-qty"><strong class="text-danger">{{ cp.stockAvailable }} uds</strong> / min {{ cp.minStock || 5 }}</span>
                       </div>
                     </div>
 
@@ -349,10 +349,10 @@ interface ScheduledProvider {
 
                     <div class="cyclic-progress-box">
                       <div class="cyclic-row">
-                        <span class="cyclic-label">Avance Bahía A-P03:</span>
-                        <span class="cyclic-val">12 / 15 SKUs</span>
+                        <span class="cyclic-label">SKUs Verificados:</span>
+                        <span class="cyclic-val">{{ products.length }} SKUs</span>
                       </div>
-                      <div class="cyclic-discrepancies">Discrepancias registradas: 0 items</div>
+                      <div class="cyclic-discrepancies">Alertas de stock bajo: {{ criticalProducts.length }} items</div>
                     </div>
 
                     <div class="tool-footer">
@@ -454,134 +454,43 @@ interface ScheduledProvider {
                 </div>
 
                 <div class="providers-list">
-                  <!-- Proveedor 1: Siderúrgica del Norte -->
-                  <div class="provider-item-card">
-                    <div class="prov-top-row">
-                      <span class="prov-title">Siderúrgica del Norte S.A.</span>
-                      <span class="pill-blue-downloading">
-                        <span class="dot-pulse"></span>
-                        Descargando
-                      </span>
-                    </div>
-                    <div class="prov-time-row">
-                      <span>Llegada: 10:30 AM</span>
-                      <span class="sep">•</span>
-                      <span>Rampa: 02</span>
-                    </div>
-                    <div class="prov-progress-wrap">
-                      <div class="progress-bar-track">
-                        <div class="progress-bar-fill" style="width: 75%;"></div>
-                      </div>
-                      <span class="prov-percent">75%</span>
-                    </div>
-                    <div class="prov-bottom-row">
-                      <span class="prov-cargo">Carga: 32 pallets perfiles</span>
-                      <a href="javascript:void(0)" class="prov-link">Ver Albarán</a>
-                    </div>
-                  </div>
-
-                  <!-- Proveedor 2: FastenerTech Latam -->
-                  <div class="provider-item-card">
-                    <div class="prov-top-row">
-                      <span class="prov-title">FastenerTech Latam</span>
-                      <span class="pill-gray-waiting">En Espera</span>
-                    </div>
-                    <div class="prov-time-row">
-                      <span>Llegada: 13:00 PM</span>
-                      <span class="sep">•</span>
-                      <span>Rampa: 04</span>
-                    </div>
-                    <p class="prov-note">Camión en patio de maniobras esperando liberación de muelle.</p>
-                    <div class="prov-bottom-row">
-                      <span class="prov-cargo">Carga: Bulones y Anclajes</span>
-                      <button class="btn-dock-assign">Asignar Muelle</button>
-                    </div>
-                  </div>
-
-                  <!-- Proveedor 3: Cementos del Valle -->
-                  <div class="provider-item-card">
-                    <div class="prov-top-row">
-                      <span class="prov-title">Cementos del Valle</span>
-                      <span class="pill-gray-waiting">Programado</span>
-                    </div>
-                    <div class="prov-time-row">
-                      <span>Llegada: 15:15 PM</span>
-                      <span class="sep">•</span>
-                      <span>Rampa: 01</span>
-                    </div>
-                    <p class="prov-note">Despacho confirmado en origen. Tránsito estimado en curso.</p>
-                    <div class="prov-bottom-row">
-                      <span class="prov-cargo">Volumen: 18 TN Silos</span>
-                      <span class="pill-green-time">En Horario</span>
-                    </div>
+                  <div *ngIf="scheduledProviders.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.8rem;">
+                    0 proveedores programados en la base de datos.
                   </div>
                 </div>
-
-                
               </div>
 
               <!-- Bloque Terminal y Dispositivos -->
               <div class="panel-card mt-4">
                 <div class="panel-header-row mb-3">
                   <div>
-                    <h2 class="panel-title">Terminal y Dispositivos</h2>
-                    <p class="panel-subtitle">Hardware vinculado a la sesión activa</p>
+                    <h2 class="panel-title">Resumen de Pedidos y Ventas</h2>
+                    <p class="panel-subtitle">Estado actual sincronizado desde /api/sale</p>
                   </div>
-                  <span class="badge-diag-ok">DIAG-OK</span>
+                  <span class="badge-diag-ok">DB SYNC</span>
                 </div>
 
                 <div class="devices-list">
-                  <!-- Dispositivo 1: Zebra TC26 -->
                   <div class="device-item">
-                    <div class="device-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                      </svg>
-                    </div>
                     <div class="device-details">
-                      <div class="device-name">Zebra TC26 (Laser)</div>
-                      <div class="device-sub">Mesh: AP-NAVE-A02 (5GHz)</div>
+                      <div class="device-name" style="color: #dc2626;">Pedidos Pendientes (En Rojo)</div>
+                      <div class="device-sub">Órdenes por despachar / cobrar</div>
                     </div>
-                    <div class="device-battery">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                        <rect x="1" y="6" width="18" height="12" rx="2"></rect>
-                        <line x1="23" y1="11" x2="23" y2="13"></line>
-                      </svg>
-                      <span>88%</span>
+                    <div class="device-battery" style="color: #dc2626; font-weight: 800;">
+                      <span>{{ pendingOrdersCount }}</span>
                     </div>
                   </div>
 
-                  <!-- Dispositivo 2: Impresora ZPL -->
                   <div class="device-item">
-                    <div class="device-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                      </svg>
-                    </div>
                     <div class="device-details">
-                      <div class="device-name">Impresora ZPL Bahía A-04</div>
-                      <div class="device-sub">Papel térmico: 4"x6" (92% rollo)</div>
+                      <div class="device-name" style="color: #16a34a;">Ventas Completadas (En Verde)</div>
+                      <div class="device-sub">Productos marcados como vendidos</div>
                     </div>
-                    <span class="pill-blue-online">
-                      <span class="dot-pulse"></span>
-                      ONLINE
-                    </span>
+                    <div class="device-battery" style="color: #16a34a; font-weight: 800;">
+                      <span>{{ paidSalesCount }}</span>
+                    </div>
                   </div>
                 </div>
-
-                <button class="btn-laser-test">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M2 12h2"></path>
-                    <path d="M20 12h2"></path>
-                    <path d="M12 2v2"></path>
-                    <path d="M12 20v2"></path>
-                    <circle cx="12" cy="12" r="4"></circle>
-                  </svg>
-                  <span>Realizar Prueba de Disparo Láser</span>
-                </button>
               </div>
             </div>
           </div>
@@ -590,14 +499,13 @@ interface ScheduledProvider {
         <footer class="employee-statusbar">
           <div class="status-left">
             <span class="status-action-dot"></span>
-            <span class="status-action-label">Última acción registrada:</span>
-            <span class="status-action-sku">SKU-7720-IPE ubicado en Bahía A-P03-R2</span>
-            <span class="status-action-time">(Confirmado a las 11:42 AM)</span>
+            <span class="status-action-label">Estado de base de datos:</span>
+            <span class="status-action-sku">{{ products.length }} SKUs • {{ sales.length }} movimientos registrados</span>
           </div>
 
           <div class="status-right">
-            <span class="status-session">Sesión: OP-MENDOZA-C</span>
-            <span class="status-brand">FIRMEZA v4.12 Enterprise</span>
+            <span class="status-session">Operador: {{ employeeName }}</span>
+            <span class="status-brand">FIRMEZA Enterprise</span>
           </div>
         </footer>
     </div>
@@ -2039,105 +1947,100 @@ export class EmployeeDashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly productsService = inject(ProductsService);
+  private readonly saleService = inject(SaleService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly ngZone = inject(NgZone);
 
   private productsSub?: Subscription;
+  private salesSub?: Subscription;
 
-  employeeName = 'Carlos Mendoza';
+  employeeName = 'Operador';
   employeeRole = 'Operador Logístico';
   stockSearchInput = '';
   activeTab: 'all' | 'picking' | 'recepciones' = 'all';
 
   products: ProductItem[] = [];
+  sales: SaleDto[] = [];
+  scheduledProviders: ScheduledProvider[] = [];
 
-  // Movimientos reales: el backend aún no expone tabla/endpoint de movimientos,
-  // por lo que los contadores reflejan 0 hasta que exista esa fuente de datos.
-  productsIngresados = 0;
-  productsDespachados = 0;
-
-  get totalMovements(): number {
-    return this.productsIngresados + this.productsDespachados;
+  get productsIngresados(): number {
+    return this.products.length;
   }
 
-  // Datos visuales basados exactamente en el diseño de la imagen
-  tasksList: AssignedTask[] = [
-    {
-      code: 'ORD-8921',
-      type: 'Picking Cliente',
-      typeClass: 'picking',
-      providerDest: 'Ferretería Central S.A.',
-      providerDestSub: 'Ruta Express D-03',
-      qtyItems: '18 items',
-      qtyItemsSub: '4 bultos',
-      status: 'EN PICKING',
-      statusClass: 'blue',
-      actionText: 'Continuar',
-      actionClass: 'primary'
-    },
-    {
-      code: 'REC-4310',
-      type: 'Recepción Proveedor',
-      typeClass: 'reception',
-      providerDest: 'Siderúrgica del Norte',
-      providerDestSub: 'Rampa 02 • Guía #88410',
-      qtyItems: '32 pallets',
-      qtyItemsSub: 'Perfiles H',
-      status: 'RAMPA DESCARGA',
-      statusClass: 'cyan',
-      actionText: 'Verificar',
-      actionClass: 'outline'
-    },
-    {
-      code: 'MOV-2290',
-      type: 'Transferencia Interna',
-      typeClass: 'transfer',
-      providerDest: 'Bahía A -> Zona Patios B',
-      providerDestSub: 'Rebalanceo de Stock',
-      qtyItems: '8 pallets',
-      qtyItemsSub: 'Calamina Galvanizada',
-      status: 'EN COLA',
-      statusClass: 'gray',
-      actionText: 'Iniciar',
-      actionClass: 'outline'
-    },
-    {
-      code: 'ORD-8919',
-      type: 'Picking Cliente',
-      typeClass: 'picking',
-      providerDest: 'Constructora Bolívar',
-      providerDestSub: 'Andén 01 • Staged',
-      qtyItems: '65 items',
-      qtyItemsSub: 'Tornillería Estructural',
-      status: 'LISTO DESPACHO',
-      statusClass: 'green',
-      actionText: 'Rótulo',
-      actionClass: 'outline',
-      hasPrintIcon: true
-    }
-  ];
+  get productsDespachados(): number {
+    return this.sales.reduce((acc, s) => acc + (s.quantity || 0), 0);
+  }
+
+  get totalMovements(): number {
+    return this.sales.length;
+  }
+
+  get pendingOrdersCount(): number {
+    return this.sales.filter(s => !s.isPaid).length;
+  }
+
+  get paidSalesCount(): number {
+    return this.sales.filter(s => s.isPaid).length;
+  }
+
+  get criticalProducts(): ProductItem[] {
+    return this.products.filter(p => this.isUnderFive(p));
+  }
+
+  get tasksList(): AssignedTask[] {
+    return this.sales.map(s => {
+      const firstDetail = s.details && s.details.length > 0 ? s.details[0] : null;
+      return {
+        code: s.isPaid ? `VTA-${s.id}` : `PED-${s.id}`,
+        type: s.isPaid ? 'Venta Completada' : 'Pedido Cliente',
+        typeClass: s.isPaid ? 'reception' : 'picking',
+        providerDest: s.clientName,
+        providerDestSub: firstDetail ? `${firstDetail.productName} (${firstDetail.productSku})` : `Pago: ${s.paymentMethod}`,
+        qtyItems: `${s.quantity} uds`,
+        qtyItemsSub: `$${s.totalAmount.toFixed(2)}`,
+        status: s.isPaid ? 'VENDIDO (VERDE)' : 'PEDIDO (ROJO)',
+        statusClass: s.isPaid ? 'green' : 'blue',
+        actionText: s.isPaid ? 'Ver Venta' : 'Gestionar',
+        actionClass: s.isPaid ? 'outline' : 'primary'
+      };
+    });
+  }
 
   ngOnInit(): void {
     const user = this.authService.getUser();
     if (user?.fullName) {
       this.employeeName = user.fullName;
+    } else if (user?.email) {
+      this.employeeName = user.email;
     }
     if (user?.role && user.role !== 'User') {
       this.employeeRole = user.role === 'Employee' ? 'Operador Logístico' : user.role;
     }
     this.loadProducts();
+    this.loadSales();
   }
 
   ngOnDestroy(): void {
     this.productsSub?.unsubscribe();
+    this.salesSub?.unsubscribe();
   }
 
   trackBySku(_: number, p: ProductItem): string {
     return p.id || p.sku;
   }
 
+  loadSales(): void {
+    this.salesSub = this.saleService.sales$.subscribe((items) => {
+      this.ngZone.run(() => {
+        this.sales = [...(items || [])];
+        this.cdr.detectChanges();
+      });
+    });
+
+    this.saleService.getSales().subscribe();
+  }
+
   loadProducts(): void {
-    console.log('[EmployeeDashboard] Suscripción en tiempo real a ProductsService...');
     this.productsSub = this.productsService.products$.subscribe((items) => {
       this.ngZone.run(() => {
         this.products = [...(items || [])];
@@ -2152,8 +2055,7 @@ export class EmployeeDashboardComponent implements OnInit, OnDestroy {
           this.cdr.detectChanges();
         });
       },
-      error: (err) => {
-        console.warn('[EmployeeDashboard] Error cargando productos:', err);
+      error: () => {
         this.cdr.detectChanges();
       }
     });
@@ -2179,10 +2081,10 @@ export class EmployeeDashboardComponent implements OnInit, OnDestroy {
 
   get filteredTasks(): AssignedTask[] {
     if (this.activeTab === 'picking') {
-      return this.tasksList.filter(t => t.type.toLowerCase().includes('picking'));
+      return this.tasksList.filter(t => t.code.startsWith('PED-'));
     }
     if (this.activeTab === 'recepciones') {
-      return this.tasksList.filter(t => t.type.toLowerCase().includes('recepción'));
+      return this.tasksList.filter(t => t.code.startsWith('VTA-'));
     }
     return this.tasksList;
   }
@@ -2191,9 +2093,7 @@ export class EmployeeDashboardComponent implements OnInit, OnDestroy {
     this.activeTab = tab;
   }
 
-  toggleUserMenu(): void {
-    // Menú visual interactivo
-  }
+  toggleUserMenu(): void {}
 
   onLogout(): void {
     this.authService.logout();

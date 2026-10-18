@@ -25,7 +25,7 @@ public class ClientService(
                 c.Id,
                 c.FirstName,
                 c.LastName,
-                c.User.Email!, // Mapear el correo desde Identity
+                c.User != null ? c.User.Email ?? c.Email : c.Email, // Mapear el correo desde Identity
                 c.Phone,
                 c.IsActive,
                 c.CreatedAt,
@@ -44,7 +44,7 @@ public class ClientService(
                 c.Id,
                 c.FirstName,
                 c.LastName,
-                c.User.Email!, // Mapear el correo desde Identity
+                c.User != null ? c.User.Email ?? c.Email : c.Email, // Mapear el correo desde Identity
                 c.Phone,
                 c.IsActive,
                 c.CreatedAt,
@@ -135,13 +135,16 @@ public class ClientService(
             client.IsActive = dto.IsActive;
             
             // Reflejar la desactivación bloqueando temporalmente la cuenta en Identity
-            if (!client.IsActive)
+            if (client.User is not null)
             {
-                await userManager.SetLockoutEndDateAsync(client.User, DateTimeOffset.MaxValue);
-            }
-            else
-            {
-                await userManager.SetLockoutEndDateAsync(client.User, null);
+                if (!client.IsActive)
+                {
+                    await userManager.SetLockoutEndDateAsync(client.User, DateTimeOffset.MaxValue);
+                }
+                else
+                {
+                    await userManager.SetLockoutEndDateAsync(client.User, null);
+                }
             }
         }
 
@@ -170,7 +173,10 @@ public class ClientService(
         client.IsActive = false;
         
         // Bloquear permanentemente la cuenta en Identity para impedir login futuro
-        await userManager.SetLockoutEndDateAsync(client.User, DateTimeOffset.MaxValue);
+        if (client.User is not null)
+        {
+            await userManager.SetLockoutEndDateAsync(client.User, DateTimeOffset.MaxValue);
+        }
 
         await context.SaveChangesAsync(cancellationToken);
         return true;
