@@ -1597,13 +1597,17 @@ export class InventoryComponent implements OnInit, OnDestroy {
   }
 
   get availableLocations(): string[] {
-    const set = new Set<string>();
+    const map = new Map<string, string>();
     for (const p of this.products) {
       if (p.location && p.location.trim()) {
-        set.add(p.location.trim());
+        const clean = p.location.trim();
+        const lower = clean.toLowerCase();
+        if (!map.has(lower)) {
+          map.set(lower, clean);
+        }
       }
     }
-    return Array.from(set).sort();
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }
 
   filterByLowStock(): void {
@@ -1746,10 +1750,14 @@ export class InventoryComponent implements OnInit, OnDestroy {
             </div>
           </div>
 
-          <!-- Ubicación Bodega -->
+          <!-- Ubicación Bodega (Combobox con opciones existentes y posibilidad de escribir nueva) -->
           <div>
             <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación en Bodega * (máx 30)</label>
-            <input id="swal-location" class="swal2-input" maxlength="30" placeholder="Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            <input id="swal-location" list="swal-locations-datalist" class="swal2-input" maxlength="30" placeholder="Selecciona o escribe: Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;" autocomplete="off">
+            <datalist id="swal-locations-datalist">
+              ${this.availableLocations.map(loc => `<option value="${loc}"></option>`).join('')}
+            </datalist>
+            <span style="font-size:0.7rem; color:#64748b; margin-top:2px; display:block;">Puedes seleccionar una ubicación existente o escribir una nueva.</span>
           </div>
 
           <!-- Precios: Costo y Venta -->
@@ -1841,6 +1849,10 @@ export class InventoryComponent implements OnInit, OnDestroy {
           return false;
         }
 
+        // Si el usuario escribió la ubicación con diferente mayúscula/minúscula (ej: "nave a"), reutilizar la existente ("Nave A")
+        const matchedLoc = this.availableLocations.find(l => l.toLowerCase() === location.toLowerCase());
+        const finalLocation = matchedLoc || location;
+
         const costNum = parseFloat(costStr || '0');
         if (isNaN(costNum) || costNum < 0) {
           Swal.showValidationMessage('El precio de costo no puede ser negativo.');
@@ -1872,7 +1884,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           description: desc || undefined,
           category,
           categoryDetail: catDetail || 'General',
-          location,
+          location: finalLocation,
           costPrice: costNum,
           salePrice: priceNum,
           price: priceNum,
@@ -1961,10 +1973,14 @@ export class InventoryComponent implements OnInit, OnDestroy {
             </div>
           </div>
 
-          <!-- Ubicación Bodega -->
+          <!-- Ubicación Bodega (Combobox con opciones existentes y posibilidad de escribir nueva) -->
           <div>
             <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación Bodega * (máx 30)</label>
-            <input id="swal-edit-location" class="swal2-input" maxlength="30" value="${item.location}" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;">
+            <input id="swal-edit-location" list="swal-edit-locations-datalist" class="swal2-input" maxlength="30" value="${item.location}" placeholder="Selecciona o escribe: Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;" autocomplete="off">
+            <datalist id="swal-edit-locations-datalist">
+              ${this.availableLocations.map(loc => `<option value="${loc}"></option>`).join('')}
+            </datalist>
+            <span style="font-size:0.7rem; color:#64748b; margin-top:2px; display:block;">Puedes seleccionar una ubicación existente o escribir una nueva.</span>
           </div>
 
           <!-- Precios: Costo y Venta -->
@@ -2042,6 +2058,10 @@ export class InventoryComponent implements OnInit, OnDestroy {
           return false;
         }
 
+        // Si el usuario escribió la ubicación con diferente mayúscula/minúscula (ej: "nave a"), reutilizar la existente ("Nave A")
+        const matchedLoc = this.availableLocations.find(l => l.toLowerCase() === location.toLowerCase());
+        const finalLocation = matchedLoc || location;
+
         const costNum = parseFloat(costStr || '0');
         if (isNaN(costNum) || costNum < 0) {
           Swal.showValidationMessage('El precio de costo no puede ser negativo.');
@@ -2071,7 +2091,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           description: desc || undefined,
           category,
           categoryDetail: catDetail || item.categoryDetail,
-          location,
+          location: finalLocation,
           costPrice: costNum,
           salePrice: priceNum,
           price: priceNum,

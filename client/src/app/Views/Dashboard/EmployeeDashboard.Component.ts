@@ -105,7 +105,7 @@ interface ScheduledProvider {
               <div class="kpi-footer-row mt-auto">
                 <span class="kpi-foot-flex">
                   <span class="dot-blue-sm"></span>
-                  Datos en tiempo real desde /api/products
+                  Catálogo general activo
                 </span>
               </div>
             </div>
@@ -260,7 +260,7 @@ interface ScheduledProvider {
                       </div>
                       <span class="tool-title">Catálogo y Consulta Stock</span>
                     </div>
-                    <p class="tool-desc">Busca existencias en tiempo real por SKU, lote o descripción.</p>
+                    <p class="tool-desc">Busca existencias por SKU, lote o descripción.</p>
                     
                     <div class="tool-search-input">
                       <input type="text" placeholder="Buscar por SKU o nombre..." [(ngModel)]="stockSearchInput" />
@@ -274,7 +274,7 @@ interface ScheduledProvider {
                       </button>
                     </div>
 
-                    <!-- Mini lista de resultados interactivos en tiempo real -->
+                    <!-- Mini lista de resultados interactivos -->
                     <div *ngIf="products.length > 0" style="margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 120px; overflow-y: auto;">
                       <div *ngFor="let p of filteredCatalogProducts.slice(0, 3); trackBy: trackBySku" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.72rem;">
                         <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden;">
@@ -294,7 +294,7 @@ interface ScheduledProvider {
 
                     <div class="tool-footer">
                       <span class="tool-count">{{ products.length | number }} SKUs en catálogo</span>
-                      <span class="tool-tag-ok">API OK</span>
+                      <span class="tool-tag-ok">DISPONIBLE</span>
                     </div>
                   </div>
 
@@ -373,10 +373,6 @@ interface ScheduledProvider {
                     <div>
                       <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         <h2 class="panel-title">Catálogo de Productos en Bahía</h2>
-                        <span class="live-status-pill" style="font-size: 0.65rem;">
-                          <span class="pulse-dot"></span>
-                          CONECTADO A /api/products
-                        </span>
                       </div>
                       <p class="panel-subtitle">Consulta de existencias y ubicación de productos asignados</p>
                     </div>
@@ -465,9 +461,9 @@ interface ScheduledProvider {
                 <div class="panel-header-row mb-3">
                   <div>
                     <h2 class="panel-title">Resumen de Pedidos y Ventas</h2>
-                    <p class="panel-subtitle">Estado actual sincronizado desde /api/sale</p>
+                    <p class="panel-subtitle">Balance y estado operativo general</p>
                   </div>
-                  <span class="badge-diag-ok">DB SYNC</span>
+                  <span class="badge-diag-ok">ACTIVO</span>
                 </div>
 
                 <div class="devices-list">
