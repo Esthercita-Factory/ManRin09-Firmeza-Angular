@@ -33,11 +33,6 @@ export const routes: Routes = [
         loadComponent: () => import('../Views/Dashboard/EmployeeDashboard.Component').then(m => m.EmployeeDashboardComponent) 
       },
       { 
-        path: 'clients', 
-        canActivate: [enterpriseOnlyGuard],
-        loadComponent: () => import('../Views/Clients/clients.component').then(m => m.ClientsComponent) 
-      },
-      { 
         path: 'enterprises', 
         loadComponent: () => import('../Views/Enterprises/enterprises.component').then(m => m.EnterprisesComponent) 
       },

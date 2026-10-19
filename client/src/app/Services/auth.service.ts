@@ -230,6 +230,35 @@ export class AuthService {
     return false;
   }
 
+  isClient(): boolean {
+    const savedType = localStorage.getItem(this.accountTypeKey);
+    if (savedType === 'persona' || savedType === 'cliente') {
+      return true;
+    }
+
+    const user = this.currentUser() || this.getStoredUser();
+    if (user) {
+      const role = (user.role || '').toLowerCase();
+      const accountType = (user.accountType || '').toLowerCase();
+      if (role === 'client' || role === 'cliente' || accountType === 'persona' || accountType === 'cliente') {
+        return true;
+      }
+    }
+
+    const token = this.getToken();
+    if (token) {
+      const decoded = decodeJwtPayload(token);
+      if (decoded) {
+        const role = getJwtRole(decoded).toLowerCase();
+        if (role === 'client' || role === 'cliente') {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   isAuthenticated(): boolean {
     const token = this.getToken();
     if (!token) return false;

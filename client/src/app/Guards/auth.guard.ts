@@ -11,6 +11,10 @@ export const authGuard: CanActivateFn = (
   const token = authService.getToken() || localStorage.getItem('firmeza_token') || localStorage.getItem('token');
 
   if (token) {
+    if (authService.isClient()) {
+      authService.logout();
+      return router.createUrlTree(['/login']);
+    }
     return true;
   }
 
@@ -27,6 +31,11 @@ export const employeeOnlyGuard: CanActivateFn = (
   const token = authService.getToken() || localStorage.getItem('firmeza_token') || localStorage.getItem('token');
 
   if (!token) {
+    return router.createUrlTree(['/login']);
+  }
+
+  if (authService.isClient()) {
+    authService.logout();
     return router.createUrlTree(['/login']);
   }
 
@@ -47,6 +56,11 @@ export const enterpriseOnlyGuard: CanActivateFn = (
   const token = authService.getToken() || localStorage.getItem('firmeza_token') || localStorage.getItem('token');
 
   if (!token) {
+    return router.createUrlTree(['/login']);
+  }
+
+  if (authService.isClient()) {
+    authService.logout();
     return router.createUrlTree(['/login']);
   }
 

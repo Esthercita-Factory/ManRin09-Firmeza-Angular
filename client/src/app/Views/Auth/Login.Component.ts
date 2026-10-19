@@ -156,7 +156,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
                 </div>
               </ng-container>
 
-              <!-- SI LA CASILLA NO ESTÁ MARCADA: Login regular (Empresas y Clientes) -->
+              <!-- SI LA CASILLA NO ESTÁ MARCADA: Login regular (Empresas) -->
               <ng-container *ngIf="!isEmployee">
                 <div class="form-group">
                   <label>Correo Electrónico</label>
@@ -914,6 +914,17 @@ export class LoginComponent implements OnInit {
         const token = response?.token || response?.Token || response?.accessToken;
         const role = response?.role || response?.Role || (this.isEmployee ? 'Employee' : 'Enterprise');
         const accountType = response?.accountType || response?.AccountType || (this.isEmployee ? 'empleado' : 'empresa');
+
+        // VALIDACIÓN: Rechazar acceso si es cuenta de Cliente
+        const roleLower = String(role || '').toLowerCase();
+        const accountTypeLower = String(accountType || '').toLowerCase();
+        if (roleLower === 'client' || roleLower === 'cliente' || accountTypeLower === 'persona' || accountTypeLower === 'cliente') {
+          this.isLoading = false;
+          this.loginMessage = null;
+          this.loginError = 'Acceso denegado: Esta plataforma es de uso exclusivo para empresas y personal operativo. Los clientes disponen de un portal independiente.';
+          this.authService.logout();
+          return;
+        }
 
         const isEmp = this.isEmployee ||
           accountType === 'empleado' ||
