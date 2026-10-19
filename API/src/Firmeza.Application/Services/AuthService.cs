@@ -314,6 +314,14 @@ public class AuthService(
         var roles = await userManager.GetRolesAsync(user);
         var primaryRole = roles.FirstOrDefault() ?? "Client";
 
+        // VALIDACIÓN: Los clientes no tienen permitido autenticarse en esta plataforma
+        if (primaryRole.Equals("Client", StringComparison.OrdinalIgnoreCase) ||
+            roles.Any(r => r.Equals("Client", StringComparison.OrdinalIgnoreCase)) ||
+            await clientRepository.ExistsByEmailAsync(cleanEmail))
+        {
+            throw new UnauthorizedAccessException("Credenciales inválidas.");
+        }
+
         // 4. Generar token
         var token = jwtTokenGenerator.GenerateToken(user.Id, user.Email!, primaryRole);
         var expiration = DateTime.UtcNow.AddHours(8);

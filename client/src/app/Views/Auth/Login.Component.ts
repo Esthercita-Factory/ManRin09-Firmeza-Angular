@@ -921,7 +921,7 @@ export class LoginComponent implements OnInit {
         if (roleLower === 'client' || roleLower === 'cliente' || accountTypeLower === 'persona' || accountTypeLower === 'cliente') {
           this.isLoading = false;
           this.loginMessage = null;
-          this.loginError = 'Acceso denegado: Esta plataforma es de uso exclusivo para empresas y personal operativo. Los clientes disponen de un portal independiente.';
+          this.loginError = 'Credenciales inválidas.';
           this.authService.logout();
           return;
         }
