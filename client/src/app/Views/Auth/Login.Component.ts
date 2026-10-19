@@ -966,7 +966,12 @@ export class LoginComponent implements OnInit {
       },
       error: (err: any) => {
         this.isLoading = false;
-        this.loginError = err?.error?.message || err?.error || err?.message || 'Error al iniciar sesión';
+        const status = err?.status;
+        if (status === 400 || status === 401 || status === 404) {
+          this.loginError = 'Credenciales inválidas.';
+        } else {
+          this.loginError = err?.error?.message || err?.error || err?.message || 'Error al iniciar sesión';
+        }
       }
     });
   }
