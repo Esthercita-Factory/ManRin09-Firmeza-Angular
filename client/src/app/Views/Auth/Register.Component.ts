@@ -1,13 +1,13 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './Register.Component.html',
   styles: [`
     :host { 
@@ -323,7 +323,7 @@ import { AuthService } from '../../Services/auth.service';
       color: #334155; 
     }
 
-    .input-wrapper, .input-select-wrapper { 
+    .input-wrapper { 
       display: flex; 
       align-items: center; 
       background: #f8fafc; 
@@ -335,7 +335,7 @@ import { AuthService } from '../../Services/auth.service';
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02); 
     }
 
-    .input-wrapper:focus-within, .input-select-wrapper:focus-within { 
+    .input-wrapper:focus-within { 
       border-color: #2563eb; 
       background: #ffffff; 
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); 
@@ -347,7 +347,7 @@ import { AuthService } from '../../Services/auth.service';
       color: #64748b; 
     }
 
-    input, select { 
+    input { 
       border: none; 
       background: transparent; 
       outline: none; 
@@ -356,29 +356,6 @@ import { AuthService } from '../../Services/auth.service';
       color: #0f172a; 
       font-family: inherit; 
     }
-
-    select { 
-      cursor: pointer; 
-    }
-
-    .checkbox-group { 
-      display: flex; 
-      align-items: center; 
-      gap: 0.6rem; 
-    }
-
-    .checkbox-group label { 
-      font-size: 0.78rem; 
-      color: #64748b; 
-      font-weight: 500; 
-    }
-
-    .checkbox-group a { 
-      color: #1d4ed8; 
-      text-decoration: none; 
-      font-weight: 600; 
-    }
-    .checkbox-group a:hover { text-decoration: underline; }
 
     .feedback-msg { 
       padding: 0.85rem 1.1rem; 
@@ -475,11 +452,9 @@ import { AuthService } from '../../Services/auth.service';
   `]
 })
 export class RegisterComponent implements OnInit {
-  // Datos Empresa
   companyName = '';
   taxId = '';
 
-  // Datos Comunes
   name = '';
   email = '';
   phone = '';

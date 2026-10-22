@@ -61,6 +61,7 @@ public record ProductResponseDto(
     Guid? RegisteredById,
     string RegisteredByName,
     int? EnterpriseId,
+    string? EnterpriseName,
     DateTime CreatedAt,
     DateTime? UpdatedAt
 );

@@ -57,35 +57,39 @@ interface ChartDayPoint {
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="fz-viewport">
-      <!-- 1. Encabezado de Control Operativo -->
-      <header class="header-banner">
-        <div class="header-left">
-          <div class="header-icon-badge">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- 1. Encabezado Estilo Firmeza Unificado -->
+      <header class="fz-header">
+        <div class="fz-header-left">
+          <div class="fz-header-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
           </div>
-          <div class="header-titles">
-            <div class="title-with-pill">
-              <h1 class="page-title">Panel General de Inventario</h1>
-              <span class="live-status-pill">
-                <span class="pulse-dot"></span>
-                SINCRONIZADO EN TIEMPO REAL
+          <div class="fz-header-titles">
+            <div class="fz-title-row">
+              <h1 class="fz-page-title">{{ companyName ? 'Panel General — ' + companyName : 'Panel General de Inventario' }}</h1>
+              <span class="fz-live-pill">
+                <span class="fz-pulse-dot"></span>
+                Sincronizado en tiempo real
               </span>
             </div>
-            <div class="status-subtitle">
-              <span>Filtro activo: <strong>{{ selectedDay ? selectedDay : 'Todos los registros' }}</strong></span>
-              <span class="sep-dot">•</span>
+            <div class="fz-subtitle">
+              <span>Filtro: <strong>{{ selectedDay ? selectedDay : 'Todos los registros' }}</strong></span>
+              <span class="fz-sep">•</span>
               <span>{{ currentDateDisplay }}</span>
+              <ng-container *ngIf="totalClients !== null">
+                <span class="fz-sep">•</span>
+                <span>{{ totalClients }} clientes registrados</span>
+              </ng-container>
             </div>
           </div>
         </div>
 
-        <div class="header-actions">
+        <div class="fz-header-actions">
           <!-- Selector de Fecha Específica para Dashboard -->
-          <div class="select-container" style="padding: 0.35rem 0.65rem;" title="Filtrar por fecha específica">
-            <svg class="pin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2">
+          <div class="fz-field" title="Filtrar por fecha específica">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -104,34 +108,8 @@ interface ChartDayPoint {
               title="Ver todos los días">✕</button>
           </div>
 
-          <!-- Dropdown Selección de Almacén -->
-          <div class="select-container">
-            <svg class="pin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            <select [(ngModel)]="selectedWarehouse" class="warehouse-dropdown">
-              <option value="central-a">Almacén Central - Nave A</option>
-              <option value="norte-b">Bodega Norte - Nave B</option>
-              <option value="occidente-c">Centro Occidente - Nave C</option>
-            </select>
-            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </div>
-
-          <!-- Botón Exportar Balance -->
-          <button class="btn-action-outline" (click)="onExportBalance()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span>Exportar Balance</span>
-          </button>
-
           <!-- Acceso directo a Movimientos y Pedidos -->
-          <a routerLink="/app/enterprises" class="btn-action-blue" style="text-decoration: none;">
+          <a routerLink="/app/enterprises" class="fz-btn fz-btn-primary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m7 16-4-4 4-4"></path>
               <path d="M3 12h18"></path>
@@ -147,9 +125,9 @@ interface ChartDayPoint {
         <!-- KPI 1: Valor Total Inventario -->
         <div class="kpi-card">
           <div class="kpi-top-row">
-            <span class="kpi-title">Valor Total Inventario</span>
+            <span class="kpi-title">VALOR TOTAL INVENTARIO</span>
             <div class="kpi-icon-container blue-tint">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="5" width="20" height="14" rx="2"></rect>
                 <line x1="2" y1="10" x2="22" y2="10"></line>
               </svg>
@@ -165,9 +143,9 @@ interface ChartDayPoint {
         <!-- KPI 2: SKUs Activos en Almacén -->
         <div class="kpi-card">
           <div class="kpi-top-row">
-            <span class="kpi-title">SKUs Activos en Almacén</span>
+            <span class="kpi-title">SKUS ACTIVOS EN ALMACÉN</span>
             <div class="kpi-icon-container teal-tint">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="7" height="7"></rect>
                 <rect x="14" y="3" width="7" height="7"></rect>
                 <rect x="8.5" y="14" width="7" height="7"></rect>
@@ -188,9 +166,9 @@ interface ChartDayPoint {
         <!-- KPI 3: Alertas de Stock Crítico -->
         <div class="kpi-card">
           <div class="kpi-top-row">
-            <span class="kpi-title">Alertas de Stock Crítico</span>
+            <span class="kpi-title">ALERTAS DE STOCK CRÍTICO</span>
             <div class="kpi-icon-container red-tint">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -210,8 +188,8 @@ interface ChartDayPoint {
         <!-- KPI 4: Movimientos / Órdenes (Lapso de Tiempo Independiente) -->
         <div class="kpi-card">
           <div class="kpi-top-row">
-            <span class="kpi-title">Movimientos / Órdenes</span>
-            <div style="display: flex; align-items: center; gap: 0.3rem;">
+            <span class="kpi-title">MOVIMIENTOS / ÓRDENES</span>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
               <select [(ngModel)]="kpiOrdersLapse" class="kpi-lapse-select" title="Filtrar métrica por lapso">
                 <option value="day">Día Arriba</option>
                 <option value="today">Hoy</option>
@@ -220,7 +198,7 @@ interface ChartDayPoint {
                 <option value="all">Todo</option>
               </select>
               <div class="kpi-icon-container blue-tint">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="1" y="3" width="15" height="13"></rect>
                   <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
                   <circle cx="5.5" cy="18.5" r="2.5"></circle>
@@ -240,62 +218,7 @@ interface ChartDayPoint {
         </div>
       </section>
 
-      <!-- 3. Accesos Rápidos / Acciones de Operación -->
-      <section class="shortcuts-grid">
-        <div class="shortcut-card" (click)="onShortcutClick('scanner')">
-          <div class="shortcut-icon blue-tint">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-              <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-              <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-              <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-              <line x1="7" y1="12" x2="17" y2="12"></line>
-            </svg>
-          </div>
-          <div class="shortcut-info">
-            <h2 class="shortcut-title">Escáner Móvil / Terminal</h2>
-            <p class="shortcut-desc">Verificación rápida de bultos y palets</p>
-          </div>
-          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-
-        <div class="shortcut-card" (click)="onShortcutClick('audit')">
-          <div class="shortcut-icon blue-tint">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 11l3 3L22 4"></path>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-          </div>
-          <div class="shortcut-info">
-            <h2 class="shortcut-title">Auditoría Cíclica de Pasillo</h2>
-            <p class="shortcut-desc">Conteo aleatorio programado (Pasillos A01-A08)</p>
-          </div>
-          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-
-        <div class="shortcut-card" (click)="onShortcutClick('losses')">
-          <div class="shortcut-icon orange-tint">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </div>
-          <div class="shortcut-info">
-            <h2 class="shortcut-title">Registro de Mermas / Daños</h2>
-            <p class="shortcut-desc">Ajuste inmediato por rotura o vencimiento</p>
-          </div>
-          <svg class="shortcut-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      </section>
-
-      <!-- 4. Sección Media: Gráfica Semanal y Reabastecimiento -->
+      <!-- 3. Sección Media: Gráfica Semanal y Reabastecimiento -->
       <section class="mid-section-grid">
         <!-- Gráfica de Movimientos Semanales (Con filtro de tiempo independiente) -->
         <div class="weekly-chart-card">
@@ -303,7 +226,6 @@ interface ChartDayPoint {
             <div>
               <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
                 <h2 class="chart-title">Flujo de Movimientos y Ventas</h2>
-                <!-- Lapso de tiempo independiente para la gráfica -->
                 <div class="chart-lapse-group">
                   <button type="button" class="lapse-btn" [class.active]="chartLapse === '7d'" (click)="setChartLapse('7d')">7 Días</button>
                   <button type="button" class="lapse-btn" [class.active]="chartLapse === '30d'" (click)="setChartLapse('30d')">30 Días</button>
@@ -315,7 +237,7 @@ interface ChartDayPoint {
                   <input type="date" [(ngModel)]="chartEndDate" class="date-chip-input" />
                 </div>
               </div>
-              <p class="chart-subtitle">Ventas realizadas (verde/azul) y pedidos pendientes (rojo) calculados desde la base de datos</p>
+              <p class="chart-subtitle">Ventas realizadas (azul) y pedidos pendientes (rojo) calculados desde la base de datos</p>
             </div>
             <div class="chart-legend-group">
               <div class="legend-item">
@@ -348,7 +270,7 @@ interface ChartDayPoint {
 
               <!-- Barras duales dinámicas de la base de datos -->
               <g *ngFor="let pt of chartPoints">
-                <!-- Ventas (Azul/Verde) -->
+                <!-- Ventas (Azul) -->
                 <rect 
                   [attr.x]="pt.x - 11" 
                   [attr.y]="pt.salesY" 
@@ -358,7 +280,7 @@ interface ChartDayPoint {
                   fill="#3b82f6">
                   <title>{{ pt.fullDate }}: {{ pt.salesCount }} ventas completadas (\${{ pt.salesAmount | number:'1.0-2' }})</title>
                 </rect>
-                <!-- Pedidos Pendientes (Rojo/Oscuro) -->
+                <!-- Pedidos Pendientes (Rojo) -->
                 <rect 
                   [attr.x]="pt.x + 2" 
                   [attr.y]="pt.ordersY" 
@@ -412,13 +334,13 @@ interface ChartDayPoint {
               </div>
               <span class="critical-count-pill">{{ criticalStockCount }} CRÍTICOS</span>
             </div>
-            <p class="restock-subtitle">Artículos que han sobrepasado su punto mínimo de reorden calculado por volumen.</p>
+            <p class="restock-subtitle">Artículos con existencias en o por debajo del punto mínimo de stock.</p>
           </div>
 
           <!-- Lista de Artículos Críticos -->
           <div class="restock-items-list">
             <div *ngIf="restockItems.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
-              No hay solicitudes críticas de reabastecimiento pendientes.
+              No hay alertas críticas de reabastecimiento pendientes.
             </div>
             <div *ngFor="let item of restockItems" class="restock-item">
               <div class="item-title-row">
@@ -432,35 +354,27 @@ interface ChartDayPoint {
                 </span>
                 <span class="aisle-info">{{ item.aisle }}</span>
               </div>
-              <button class="btn-solicitar" (click)="onRequestRestock(item)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="9" cy="21" r="1"></circle>
-                  <circle cx="20" cy="21" r="1"></circle>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-                <span>Solicitar Pedido</span>
-              </button>
             </div>
           </div>
 
           <div class="restock-footer">
-            <a routerLink="/app/inventory" class="catalog-link">Ver catálogo completo en Inventario →</a>
+            <a routerLink="/app/inventory" class="catalog-link">Gestionar stock en Inventario →</a>
           </div>
         </div>
       </section>
 
-      <!-- 5. Catálogo de Productos Registrados (ProductsService) -->
-      <section class="transactions-card" style="margin-bottom: 1.5rem;">
+      <!-- 4. Catálogo de Productos Registrados (ProductsService) -->
+      <section class="table-card" style="margin-bottom: 1.5rem;">
         <div class="table-top-bar">
           <div>
             <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
               <h2 class="table-card-title">Catálogo y Control de Productos</h2>
-              <span class="live-status-pill">
-                <span class="pulse-dot"></span>
+              <span class="fz-live-pill">
+                <span class="fz-pulse-dot"></span>
                 BD: {{ products.length }} ARTÍCULOS
               </span>
             </div>
-            <p class="table-card-subtitle">Productos activos del almacén sincronizados en tiempo real mediante ProductsService</p>
+            <p class="table-card-subtitle">Productos activos del almacén sincronizados en tiempo real</p>
           </div>
 
           <div class="table-controls">
@@ -479,7 +393,7 @@ interface ChartDayPoint {
             </div>
 
             <!-- Botón Ir a Inventario -->
-            <a routerLink="/app/inventory" class="btn-action-blue" style="text-decoration: none; padding: 0.45rem 0.85rem; font-size: 0.78rem;">
+            <a routerLink="/app/inventory" class="fz-btn fz-btn-outline" style="padding: 0.45rem 0.85rem; font-size: 0.76rem;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
               </svg>
@@ -522,7 +436,7 @@ interface ChartDayPoint {
                 <td>\${{ prod.costPrice || '0.00' }}</td>
                 <td>\${{ prod.salePrice || '0.00' }}</td>
                 <td>
-                  <span [class]="'status-pill ' + (isUnderFive(prod) ? 'transit' : 'completed')">
+                  <span [class]="'status-pill ' + (isUnderFive(prod) ? 'verification' : 'completed')">
                     {{ isUnderFive(prod) ? 'Stock Bajo' : 'Normal' }}
                   </span>
                 </td>
@@ -537,8 +451,8 @@ interface ChartDayPoint {
         </div>
       </section>
 
-      <!-- 6. Tabla de Registro de Movimientos y Pedidos -->
-      <section class="transactions-card">
+      <!-- 5. Tabla de Registro de Movimientos y Pedidos -->
+      <section class="table-card">
         <div class="table-top-bar">
           <div>
             <h2 class="table-card-title">Registro de Movimientos y Pedidos</h2>
@@ -655,118 +569,22 @@ interface ChartDayPoint {
     </div>
   `,
   styles: [`
-    .fz-viewport {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      padding: 1.25rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #0f172a;
+    :host {
+      display: block;
       background-color: #f8fafc;
-      min-height: 100vh;
-      box-sizing: border-box;
-    }
-
-    .header-banner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #ffffff;
-      border: 1px solid rgba(226, 232, 240, 0.85);
-      border-radius: 12px;
-      padding: 1.15rem 1.4rem;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-    }
-
-    .header-icon-badge {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background: #eff6ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .title-with-pill {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .page-title {
-      font-size: 1.18rem;
-      font-weight: 700;
+      min-height: 100%;
       color: #0f172a;
-      margin: 0;
-      letter-spacing: -0.02em;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.012em;
     }
 
-    .live-status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      padding: 0.25rem 0.7rem;
-      font-size: 0.64rem;
-      font-weight: 700;
-      color: #475569;
-    }
-
-    .pulse-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
-    }
-
-    .status-subtitle {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.74rem;
-      color: #64748b;
-      margin-top: 0.15rem;
-    }
-
-    .sep-dot {
-      color: #cbd5e1;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .select-container {
-      display: flex;
-      align-items: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0.5rem 0.8rem;
-      gap: 0.5rem;
-    }
-
+    /* Selector de fecha de cabecera alineado con fz-field */
     .date-input-field {
       border: none;
       background: transparent;
-      font-size: 0.76rem;
+      font-size: 0.78rem;
       font-weight: 600;
       color: #1e293b;
       outline: none;
@@ -780,51 +598,12 @@ interface ChartDayPoint {
       color: #94a3b8;
       font-size: 0.75rem;
       cursor: pointer;
-      padding: 0 0.15rem;
+      padding: 0 0.2rem;
+      font-weight: 700;
     }
 
     .btn-clear-date:hover {
       color: #ef4444;
-    }
-
-    .warehouse-dropdown {
-      border: none;
-      background: transparent;
-      outline: none;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #1e293b;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .btn-action-outline {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 0.5rem 0.95rem;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .btn-action-blue {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: #2563eb;
-      border: 1px solid #2563eb;
-      color: #ffffff;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 0.5rem 0.95rem;
-      border-radius: 8px;
-      cursor: pointer;
-      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
     }
 
     /* KPIs Grid */
@@ -841,61 +620,85 @@ interface ChartDayPoint {
       padding: 1.15rem 1.25rem;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+      gap: 0.45rem;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+      border-color: rgba(203, 213, 225, 0.9);
     }
 
     .kpi-top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.75rem;
     }
 
     .kpi-title {
-      font-size: 0.76rem;
-      font-weight: 600;
+      font-size: 0.74rem;
+      font-weight: 700;
       color: #64748b;
+      letter-spacing: 0.04em;
     }
 
     .kpi-lapse-select {
       border: 1px solid #cbd5e1;
-      border-radius: 5px;
+      border-radius: 6px;
       background: #f8fafc;
-      font-size: 0.65rem;
+      font-size: 0.68rem;
       font-weight: 600;
       color: #334155;
-      padding: 0.15rem 0.35rem;
+      padding: 0.2rem 0.45rem;
       outline: none;
       cursor: pointer;
+      font-family: inherit;
     }
 
     .kpi-icon-container {
-      width: 30px;
-      height: 30px;
-      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
-    .blue-tint { background: #eff6ff; }
-    .teal-tint { background: #f0fdf4; }
-    .red-tint { background: #fee2e2; }
-    .orange-tint { background: #fff7ed; }
+    .blue-tint { background: #eff6ff; border: 1px solid #dbeafe; }
+    .teal-tint { background: #f0fdf4; border: 1px solid #dcfce7; }
+    .red-tint { background: #fee2e2; border: 1px solid #fecaca; }
+    .orange-tint { background: #fff7ed; border: 1px solid #ffedd5; }
 
     .kpi-big-value {
       font-size: 1.7rem;
       font-weight: 800;
       color: #0f172a;
-      letter-spacing: -0.03em;
-      margin-bottom: 0.75rem;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+    }
+
+    .alert-red-number {
+      color: #dc2626;
+    }
+
+    .alert-suffix, .order-suffix {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
+      margin-left: 0.35rem;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .kpi-bottom-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: 0.73rem;
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 0.15rem;
     }
 
     .kpi-bottom-row.space-between {
@@ -905,8 +708,9 @@ interface ChartDayPoint {
     .kpi-pill {
       font-size: 0.66rem;
       font-weight: 700;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      padding: 0.18rem 0.5rem;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
     }
 
     .green-pill {
@@ -917,6 +721,11 @@ interface ChartDayPoint {
     .red-pill {
       background: #fee2e2;
       color: #dc2626;
+    }
+
+    .delivery-rate {
+      font-weight: 600;
+      color: #2563eb;
     }
 
     .progress-bar-track {
@@ -934,60 +743,16 @@ interface ChartDayPoint {
     }
 
     .progress-label {
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       font-weight: 600;
-      color: #64748b;
+      color: #1e293b;
     }
 
     .kpi-progress-row {
       display: flex;
       align-items: center;
       gap: 0.6rem;
-    }
-
-    /* Shortcuts Grid */
-    .shortcuts-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.15rem;
-    }
-
-    .shortcut-card {
-      background: #ffffff;
-      border: 1px solid rgba(226, 232, 240, 0.85);
-      border-radius: 10px;
-      padding: 0.95rem 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      cursor: pointer;
-    }
-
-    .shortcut-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .shortcut-info {
-      flex: 1;
-    }
-
-    .shortcut-title {
-      font-size: 0.84rem;
-      font-weight: 700;
-      color: #0f172a;
-      margin: 0;
-    }
-
-    .shortcut-desc {
-      font-size: 0.71rem;
-      color: #64748b;
-      margin: 0.12rem 0 0;
+      margin-top: 0.15rem;
     }
 
     /* Mid Section: Weekly Chart + Restock */
@@ -1003,6 +768,7 @@ interface ChartDayPoint {
       border-radius: 12px;
       display: flex;
       flex-direction: column;
+      box-shadow: 0 1px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.04);
     }
 
     .chart-header {
@@ -1016,13 +782,14 @@ interface ChartDayPoint {
 
     .chart-title {
       font-size: 0.95rem;
-      font-weight: 700;
+      font-weight: 800;
       color: #0f172a;
       margin: 0;
+      letter-spacing: -0.02em;
     }
 
     .chart-subtitle {
-      font-size: 0.73rem;
+      font-size: 0.74rem;
       color: #64748b;
       margin: 0.2rem 0 0;
     }
@@ -1030,7 +797,7 @@ interface ChartDayPoint {
     .chart-lapse-group {
       display: inline-flex;
       border: 1px solid #cbd5e1;
-      border-radius: 6px;
+      border-radius: 8px;
       overflow: hidden;
       background: #f8fafc;
     }
@@ -1038,11 +805,13 @@ interface ChartDayPoint {
     .lapse-btn {
       border: none;
       background: transparent;
-      padding: 0.2rem 0.55rem;
-      font-size: 0.68rem;
+      padding: 0.28rem 0.65rem;
+      font-size: 0.7rem;
       font-weight: 600;
       color: #64748b;
       cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
     }
 
     .lapse-btn.active {
@@ -1052,9 +821,9 @@ interface ChartDayPoint {
 
     .date-chip-input {
       border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      padding: 0.15rem 0.35rem;
-      font-size: 0.68rem;
+      border-radius: 6px;
+      padding: 0.22rem 0.45rem;
+      font-size: 0.7rem;
       outline: none;
       font-family: inherit;
     }
@@ -1071,6 +840,7 @@ interface ChartDayPoint {
       gap: 0.4rem;
       font-size: 0.72rem;
       color: #64748b;
+      font-weight: 500;
     }
 
     .legend-box {
@@ -1088,7 +858,7 @@ interface ChartDayPoint {
       color: #475569;
       background: #f1f5f9;
       padding: 0.2rem 0.55rem;
-      border-radius: 4px;
+      border-radius: 20px;
     }
 
     .chart-canvas-container {
@@ -1115,12 +885,13 @@ interface ChartDayPoint {
       font-weight: 600;
       color: #64748b;
       text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .chart-summary-bar {
       display: flex;
       justify-content: space-around;
-      padding: 0.85rem 1.4rem;
+      padding: 0.95rem 1.4rem;
       border-top: 1px solid #f1f5f9;
       background: #fafafc;
       border-radius: 0 0 12px 12px;
@@ -1137,11 +908,12 @@ interface ChartDayPoint {
     .summary-label {
       font-size: 0.65rem;
       font-weight: 700;
+      letter-spacing: 0.04em;
       color: #64748b;
     }
 
     .summary-val {
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 700;
     }
 
@@ -1155,6 +927,7 @@ interface ChartDayPoint {
       border-radius: 12px;
       display: flex;
       flex-direction: column;
+      box-shadow: 0 1px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.04);
     }
 
     .restock-header {
@@ -1172,14 +945,15 @@ interface ChartDayPoint {
     .restock-title-group {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.5rem;
     }
 
     .restock-title {
-      font-size: 0.92rem;
-      font-weight: 700;
+      font-size: 0.95rem;
+      font-weight: 800;
       color: #0f172a;
       margin: 0;
+      letter-spacing: -0.02em;
     }
 
     .critical-count-pill {
@@ -1187,33 +961,42 @@ interface ChartDayPoint {
       font-weight: 700;
       color: #dc2626;
       background: #fee2e2;
-      padding: 0.18rem 0.45rem;
-      border-radius: 4px;
+      border: 1px solid #fecaca;
+      padding: 0.18rem 0.5rem;
+      border-radius: 20px;
     }
 
     .restock-subtitle {
-      font-size: 0.71rem;
+      font-size: 0.72rem;
       color: #64748b;
       margin: 0;
     }
 
     .restock-items-list {
       flex: 1;
-      padding: 0.5rem 1.25rem;
+      padding: 0.75rem 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 0.8rem;
+      gap: 0.75rem;
       overflow-y: auto;
       max-height: 280px;
     }
 
     .restock-item {
-      padding: 0.65rem;
+      padding: 0.75rem 0.85rem;
       border: 1px solid #f1f5f9;
       border-radius: 8px;
       display: flex;
       flex-direction: column;
       gap: 0.3rem;
+      background: #fafafc;
+      transition: all 0.18s ease;
+    }
+
+    .restock-item:hover {
+      background: #ffffff;
+      border-color: #e2e8f0;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
     }
 
     .item-title-row {
@@ -1229,74 +1012,66 @@ interface ChartDayPoint {
     }
 
     .badge-critical {
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       font-weight: 700;
       background: #fee2e2;
       color: #dc2626;
-      padding: 0.12rem 0.4rem;
-      border-radius: 3px;
+      padding: 0.14rem 0.45rem;
+      border-radius: 4px;
     }
 
     .badge-low {
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       font-weight: 700;
       background: #fef3c7;
       color: #d97706;
-      padding: 0.12rem 0.4rem;
-      border-radius: 3px;
+      padding: 0.14rem 0.45rem;
+      border-radius: 4px;
     }
 
     .item-sku {
-      font-size: 0.67rem;
+      font-size: 0.68rem;
       color: #64748b;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .item-stats-row {
       display: flex;
       justify-content: space-between;
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       color: #475569;
     }
 
-    .btn-solicitar {
-      margin-top: 0.3rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 5px;
-      padding: 0.3rem 0.5rem;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: #2563eb;
-      cursor: pointer;
-    }
-
     .restock-footer {
-      padding: 0.75rem 1.25rem;
+      padding: 0.85rem 1.25rem;
       border-top: 1px solid #f1f5f9;
       text-align: center;
     }
 
     .catalog-link {
-      font-size: 0.74rem;
-      font-weight: 600;
+      font-size: 0.76rem;
+      font-weight: 700;
       color: #2563eb;
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
     }
 
-    /* Transactions & Products Table */
-    .transactions-card {
+    .catalog-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Table Cards */
+    .table-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
       border-radius: 12px;
-      padding: 1.25rem;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: 0 1px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.04);
       display: flex;
       flex-direction: column;
-      gap: 0.9rem;
     }
 
     .table-top-bar {
@@ -1305,25 +1080,28 @@ interface ChartDayPoint {
       align-items: center;
       flex-wrap: wrap;
       gap: 0.85rem;
+      padding: 1.15rem 1.25rem;
+      border-bottom: 1px solid #f1f5f9;
     }
 
     .table-card-title {
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 0.98rem;
+      font-weight: 800;
       color: #0f172a;
       margin: 0;
+      letter-spacing: -0.02em;
     }
 
     .table-card-subtitle {
-      font-size: 0.73rem;
+      font-size: 0.74rem;
       color: #64748b;
-      margin: 0.15rem 0 0;
+      margin: 0.2rem 0 0;
     }
 
     .table-controls {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.65rem;
       flex-wrap: wrap;
     }
 
@@ -1332,50 +1110,70 @@ interface ChartDayPoint {
       border: 1px solid #cbd5e1;
       border-radius: 8px;
       overflow: hidden;
+      background: #f8fafc;
     }
 
     .filter-tab-btn {
       border: none;
       background: transparent;
-      padding: 0.4rem 0.75rem;
-      font-size: 0.73rem;
-      font-weight: 500;
+      padding: 0.42rem 0.85rem;
+      font-size: 0.74rem;
+      font-weight: 600;
       color: #64748b;
       cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
     }
 
     .filter-tab-btn.active {
       background: #0f172a;
       color: #ffffff;
-      font-weight: 600;
     }
 
     .table-search-box {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
       background: #f8fafc;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
-      padding: 0.35rem 0.65rem;
+      padding: 0.42rem 0.75rem;
+      transition: all 0.2s ease;
+    }
+
+    .table-search-box:focus-within {
+      background: #ffffff;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
     .table-search-input {
       border: none;
       background: transparent;
       outline: none;
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       font-family: inherit;
-      width: 170px;
+      width: 180px;
+      color: #0f172a;
     }
 
     .btn-table-refresh {
       background: #ffffff;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
-      padding: 0.4rem 0.55rem;
+      padding: 0.42rem 0.65rem;
       color: #64748b;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s ease;
+    }
+
+    .btn-table-refresh:hover {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #94a3b8;
     }
 
     .table-wrapper {
@@ -1385,7 +1183,7 @@ interface ChartDayPoint {
     .inventory-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.78rem;
+      font-size: 0.77rem;
     }
 
     .inventory-table th {
@@ -1397,31 +1195,37 @@ interface ChartDayPoint {
       color: #64748b;
       border-bottom: 1px solid #e2e8f0;
       text-transform: uppercase;
-      background: #ffffff;
+      background: #f8fafc;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .inventory-table td {
       padding: 0.85rem 0.95rem;
       border-bottom: 1px solid #f1f5f9;
       vertical-align: middle;
+      transition: background-color 0.15s ease;
+    }
+
+    .inventory-table tbody tr:hover td {
+      background-color: #f8fafc;
     }
 
     .product-cell {
       display: flex;
       flex-direction: column;
+      gap: 0.1rem;
     }
 
     .product-title {
       font-weight: 700;
       color: #0f172a;
-      font-size: 0.8rem;
+      font-size: 0.79rem;
     }
 
     .product-sku-detail {
       font-size: 0.69rem;
       color: #64748b;
-      margin-top: 0.1rem;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .pill-type {
@@ -1429,9 +1233,10 @@ interface ChartDayPoint {
       align-items: center;
       gap: 0.35rem;
       padding: 0.22rem 0.6rem;
-      border-radius: 5px;
+      border-radius: 20px;
       font-size: 0.68rem;
       font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
     .pill-type.entrada {
@@ -1456,21 +1261,23 @@ interface ChartDayPoint {
     .qty-positive {
       font-weight: 700;
       color: #16a34a;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .qty-negative {
       font-weight: 700;
       color: #dc2626;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .location-badge {
       display: inline-block;
-      padding: 0.18rem 0.5rem;
+      padding: 0.2rem 0.55rem;
       background: #f1f5f9;
       border: 1px solid #e2e8f0;
-      border-radius: 5px;
-      font-family: monospace;
-      font-size: 0.69rem;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
       font-weight: 600;
       color: #334155;
     }
@@ -1494,13 +1301,14 @@ interface ChartDayPoint {
 
     .operator-name {
       color: #334155;
-      font-weight: 500;
+      font-weight: 600;
       font-size: 0.76rem;
     }
 
     .datetime-cell {
-      color: #475569;
+      color: #64748b;
       font-size: 0.74rem;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .status-pill {
@@ -1508,9 +1316,9 @@ interface ChartDayPoint {
       align-items: center;
       gap: 0.35rem;
       padding: 0.22rem 0.6rem;
-      border-radius: 14px;
+      border-radius: 20px;
       font-size: 0.69rem;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .status-pill.completed {
@@ -1528,7 +1336,10 @@ interface ChartDayPoint {
     @media (max-width: 1024px) {
       .kpis-grid { grid-template-columns: repeat(2, 1fr); }
       .mid-section-grid { grid-template-columns: 1fr; }
-      .shortcuts-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .kpis-grid { grid-template-columns: 1fr; }
     }
   `]
 })
@@ -1543,7 +1354,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private productsSub?: Subscription;
   private salesSub?: Subscription;
 
-  selectedWarehouse = 'central-a';
+  companyName = '';
+  totalClients: number | null = null;
   searchFilter = '';
   productsSearchFilter = '';
   activeTab = 'Todos';
@@ -1854,12 +1666,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Inicializar fecha de hoy por defecto para el selector de día específico
     const today = new Date();
     this.selectedDay = today.toISOString().substring(0, 10);
 
     this.dashboardService.getDashboardData().subscribe({
-      next: () => {},
+      next: (res: any) => {
+        this.ngZone.run(() => {
+          if (res?.company?.businessName) {
+            this.companyName = res.company.businessName;
+          } else if (res?.user?.fullName) {
+            this.companyName = res.user.fullName;
+          }
+          if (typeof res?.company?.totalClients === 'number') {
+            this.totalClients = res.company.totalClients;
+          }
+          this.cdr.detectChanges();
+        });
+      },
       error: () => {}
     });
 
@@ -1929,10 +1752,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       p.location.toLowerCase().includes(term)
     );
   }
-
-  onExportBalance(): void {}
-  onShortcutClick(type: string): void {}
-  onRequestRestock(item: RestockItem): void {}
 
   refreshTransactions(): void {
     this.saleService.getSales().subscribe();

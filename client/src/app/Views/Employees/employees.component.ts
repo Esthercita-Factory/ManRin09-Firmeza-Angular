@@ -7,6 +7,7 @@ import { EmployeeService, EmployeeDto, CreateEmployeeDto, UpdateEmployeeDto } fr
 import Swal from 'sweetalert2';
 
 interface RecentEmployee {
+  rawId: number;
   id: string;
   name: string;
   phone?: string;
@@ -16,7 +17,8 @@ interface RecentEmployee {
   documentType: string;
   documentNumber: string;
   role: string;
-  location?: string;
+  isActive: boolean;
+  createdAt?: string;
   status: string;
   statusClass: 'active' | 'pending';
 }
@@ -27,7 +29,7 @@ interface RecentEmployee {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="fz-viewport">
-      <!-- 1. Encabezado (formato Dashboard / Inicio) -->
+      <!-- 1. Encabezado -->
       <header class="fz-header">
         <div class="fz-header-left">
           <div class="fz-header-icon">
@@ -43,35 +45,23 @@ interface RecentEmployee {
               <h1 class="fz-page-title">Gestión y Alta de Personal / Empleados</h1>
               <span class="fz-live-pill">
                 <span class="fz-pulse-dot"></span>
-                Módulo de identidad activo
+                Sincronizado con BD
               </span>
             </div>
             <div class="fz-subtitle">
-              <span>RRHH &amp; Operaciones de Almacén</span>
-              <span class="fz-sep">•</span>
-              <span>Validación RENAPO/RUT en línea</span>
+              <span>Registro, consulta por documento y administración de empleados</span>
             </div>
           </div>
         </div>
 
         <div class="fz-header-actions">
-          <button class="fz-btn fz-btn-outline">
+          <button class="fz-btn fz-btn-outline" (click)="fetchEmployeesFromApi()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
-            <span>Descargar Plantilla</span>
-          </button>
-
-          <button class="fz-btn fz-btn-dark">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <line x1="9" y1="15" x2="15" y2="15"></line>
-            </svg>
-            <span>Importar Nómina Masiva</span>
+            <span>Actualizar</span>
           </button>
         </div>
       </header>
@@ -133,9 +123,9 @@ interface RecentEmployee {
         </div>
       </section>
 
-      <!-- 3. Sección Media: Formulario de Alta + Resumen de Colaboradores -->
+      <!-- 3. Sección Media: Formulario de Alta + Resumen de Colaborador -->
       <section class="main-split-grid">
-        <!-- Formulario: Alta Rápida por Cédula / Documento -->
+        <!-- Formulario: Alta y Búsqueda por Cédula / Documento -->
         <div class="form-card">
           <div class="form-card-header">
             <div class="card-title-group">
@@ -147,16 +137,15 @@ interface RecentEmployee {
                 </svg>
               </div>
               <div>
-                <h2 class="card-title">Alta Rápida por Cédula / Documento</h2>
-                <p class="card-subtitle">Verificación automática con registros gubernamentales y perfiles de bodega</p>
+                <h2 class="card-title">Búsqueda y Registro por Cédula / Documento</h2>
+                <p class="card-subtitle">Consulta empleados existentes por documento o registra un nuevo colaborador</p>
               </div>
             </div>
-            <span class="step-badge">Paso 1 de 2</span>
           </div>
 
-          <!-- Cuadro de Validación Oficial / Búsqueda por Cédula (GET) -->
+          <!-- Cuadro de Búsqueda por Cédula (GET) -->
           <div class="validation-callout-box">
-            <label class="callout-label">NÚMERO DE IDENTIFICACIÓN / DOCUMENTO *</label>
+            <label class="callout-label">CONSULTAR EMPLEADO POR DOCUMENTO</label>
             <div class="callout-inputs-row">
               <input 
                 type="text" 
@@ -170,14 +159,14 @@ interface RecentEmployee {
                   <circle cx="11" cy="11" r="8"></circle>
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <span>{{ isSearching ? 'Consultando...' : 'Buscar / Validar' }}</span>
+                <span>{{ isSearching ? 'Consultando...' : 'Buscar Empleado' }}</span>
               </button>
             </div>
             <div class="callout-footer-note">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
-              <span>Consulta por Cédula en tiempo real mediante GET hacia la base de datos corporativa.</span>
+              <span>Consulta por número de documento en la base de datos de tu empresa.</span>
             </div>
           </div>
 
@@ -188,11 +177,6 @@ interface RecentEmployee {
                 <label>Nombre Completo *</label>
                 <div class="input-with-end-icon">
                   <input type="text" [(ngModel)]="formName" name="formName" placeholder="Ej. Carlos Mendoza Silva" class="form-input" required />
-                  <svg class="end-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                  </svg>
                 </div>
                 <span class="field-hint">Nombre y apellidos del colaborador.</span>
               </div>
@@ -201,9 +185,6 @@ interface RecentEmployee {
                 <label>Teléfono de Contacto *</label>
                 <div class="input-with-end-icon">
                   <input type="tel" [(ngModel)]="formPhone" name="formPhone" placeholder="Ej. +57 300 123 4567" class="form-input" required />
-                  <svg class="end-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                  </svg>
                 </div>
                 <span class="field-hint">Número de teléfono móvil directo.</span>
               </div>
@@ -213,7 +194,7 @@ interface RecentEmployee {
               <div class="input-field-group">
                 <label>Número de Identificación / Cédula *</label>
                 <input type="text" [(ngModel)]="formDocumentNumber" name="formDocumentNumber" placeholder="Ej. 18.492.301-4 o 1098765432" class="form-input" required />
-                <span class="field-hint">Cédula o documento de identidad registrado (único).</span>
+                <span class="field-hint">Este número será la credencial de acceso del empleado.</span>
               </div>
 
               <div class="input-field-group creatable-role-group">
@@ -277,7 +258,7 @@ interface RecentEmployee {
                   </div>
                 </div>
 
-                <span class="field-hint">Puedes escribir un nuevo rol o elegir uno existente de la lista.</span>
+                <span class="field-hint">Puedes escribir un nuevo rol o elegir uno existente.</span>
               </div>
             </div>
 
@@ -292,7 +273,6 @@ interface RecentEmployee {
             <div class="form-actions-row">
               <div class="left-actions">
                 <button type="button" class="btn-cancel" (click)="onResetForm()" [disabled]="isLoading">Limpiar Formulario</button>
-                <button type="button" class="btn-draft" (click)="onSaveDraft()" [disabled]="isLoading">Guardar Borrador</button>
               </div>
               <button type="submit" class="btn-primary-register" [disabled]="isLoading">
                 <svg *ngIf="!isLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -301,21 +281,20 @@ interface RecentEmployee {
                   <line x1="20" y1="8" x2="20" y2="14"></line>
                   <line x1="23" y1="11" x2="17" y2="11"></line>
                 </svg>
-                <span>{{ isLoading ? 'Registrando en Servidor...' : 'Registrar Empleado' }}</span>
+                <span>{{ isLoading ? 'Registrando...' : 'Registrar Empleado' }}</span>
               </button>
             </div>
           </form>
         </div>
 
-        <!-- Columna Derecha: Tarjeta de Empleado Reciente & Distribución -->
+        <!-- Columna Derecha: Tarjeta de Empleado Consultado / Seleccionado -->
         <div class="right-column-stack">
-          <!-- Card: Empleado Consultado / Reciente -->
           <div class="profile-card">
-            <!-- Caso 0: Animación de Carga mientras se consulta por Cédula (isSearching = true) -->
+            <!-- Caso 0: Animación de Carga mientras se consulta por Cédula -->
             <div *ngIf="isSearching" class="searching-spinner-box">
               <div class="spinner-ring"></div>
               <h3 class="searching-title">Consultando Empleado...</h3>
-              <p class="searching-desc">Verificando número de documento en la base de datos corporativa.</p>
+              <p class="searching-desc">Verificando número de documento en la base de datos.</p>
             </div>
 
             <!-- Caso A: Estado Inicial sin empleado buscado o seleccionado -->
@@ -328,14 +307,14 @@ interface RecentEmployee {
                   <line x1="19" y1="15" x2="19.01" y2="15"></line>
                 </svg>
               </div>
-              <h3 class="empty-title">No has buscado empleados</h3>
-              <p class="empty-desc">Ingresa un número de cédula en la casilla de búsqueda superior para consultar la información de un colaborador registrado o completa el formulario para dar de alta uno nuevo.</p>
+              <h3 class="empty-title">Ningún empleado seleccionado</h3>
+              <p class="empty-desc">Busca un empleado por su cédula arriba, haz clic en "Ver / Editar" en la tabla inferior, o registra uno nuevo.</p>
             </div>
 
-            <!-- Caso B: Empleado consultado por GET o registrado por POST (activeEmployee != null) -->
+            <!-- Caso B: Empleado consultado o seleccionado -->
             <ng-container *ngIf="!isSearching && activeEmployee">
               <div class="profile-card-header">
-                <span class="card-caption">COLABORADOR CONSULTADO / ENCONTRADO</span>
+                <span class="card-caption">DETALLE DEL COLABORADOR</span>
                 <div class="header-status-controls">
                   <span class="status-badge" [ngClass]="activeEmployee.isActive ? 'green-badge' : 'gray-badge'">
                     <span class="badge-dot" [ngClass]="activeEmployee.isActive ? 'green-dot' : 'gray-dot'"></span>
@@ -397,30 +376,17 @@ interface RecentEmployee {
                       <path d="M12 20h9"></path>
                       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                     </svg>
-                    <span>Editar Empleado</span>
+                    <span>Editar Datos</span>
                   </button>
                   <button 
-                    class="btn-profile-outline" 
-                    [ngClass]="activeEmployee.isActive ? 'btn-outline-danger' : 'btn-outline-success'"
-                    (click)="onToggleActiveStatus()" 
+                    class="btn-profile-outline btn-outline-danger" 
+                    (click)="onDeleteActiveEmployee()" 
                     [disabled]="isUpdatingStatus">
-                    <svg *ngIf="activeEmployee.isActive" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                    <svg *ngIf="!activeEmployee.isActive" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    <span>{{ activeEmployee.isActive ? 'Marcar Inactivo' : 'Marcar Activo' }}</span>
-                  </button>
-                  <button class="btn-profile-outline" (click)="onUseActiveInForm()" title="Cargar este empleado en el formulario">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                     </svg>
-                    <span>Copiar a Form</span>
+                    <span>Eliminar</span>
                   </button>
                 </div>
               </ng-container>
@@ -526,7 +492,7 @@ interface RecentEmployee {
         </div>
       </section>
 
-      <!-- 4. Tabla de Registro Histórico de Altas Recientes -->
+      <!-- 4. Tabla de Empleados Registrados -->
       <section class="table-card">
         <div class="table-card-header">
           <div class="table-titles">
@@ -537,31 +503,24 @@ interface RecentEmployee {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
-              <h3 class="table-heading">Registro Histórico de Altas Recientes</h3>
+              <h3 class="table-heading">Listado de Empleados Registrados</h3>
             </div>
-            <p class="table-subheading">Listado de operarios y personal técnico incorporados en las últimas 72 horas</p>
+            <p class="table-subheading">Colaboradores registrados en la base de datos de tu empresa</p>
           </div>
 
           <div class="table-controls">
             <div class="search-input-box">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
               <input 
                 type="text" 
                 [(ngModel)]="searchQuery" 
-                placeholder="Filtrar por nombre o c..." 
+                placeholder="Filtrar por nombre o cédula..." 
                 class="filter-input" 
               />
             </div>
-            <button class="btn-export-table">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span>Exportar</span>
-            </button>
           </div>
         </div>
 
@@ -573,7 +532,8 @@ interface RecentEmployee {
                 <th>COLABORADOR</th>
                 <th>DOCUMENTO OFICIAL</th>
                 <th>CARGO ASIGNADO</th>
-                <th>ESTADO CREDENCIAL</th>
+                <th>ESTADO</th>
+                <th style="text-align: right;">ACCIONES</th>
               </tr>
             </thead>
             <tbody>
@@ -602,6 +562,26 @@ interface RecentEmployee {
                     {{ emp.status }}
                   </span>
                 </td>
+                <td style="text-align: right;">
+                  <div class="actions-group" style="justify-content: flex-end;">
+                    <button class="table-action-btn" (click)="onSelectEmployeeFromTable(emp)" title="Ver / Editar colaborador">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                      </svg>
+                    </button>
+                    <button class="table-action-btn" (click)="onDeleteEmployeeFromTable(emp)" title="Eliminar colaborador">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="filteredEmployees.length === 0">
+                <td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">
+                  No hay empleados registrados que coincidan con el filtro.
+                </td>
               </tr>
             </tbody>
           </table>
@@ -609,11 +589,6 @@ interface RecentEmployee {
 
         <div class="table-footer">
           <span class="showing-count">Mostrando {{ filteredEmployees.length }} de {{ employeesList.length }} colaboradores registrados</span>
-          <div class="pagination-buttons">
-            <button class="btn-page-nav">Anterior</button>
-            <button class="btn-page-num active">1</button>
-            <button class="btn-page-nav">Siguiente</button>
-          </div>
         </div>
       </section>
     </div>
@@ -628,122 +603,6 @@ interface RecentEmployee {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       letter-spacing: -0.012em;
-    }
-
-    /* El contenedor y el encabezado usan .fz-viewport / .fz-header (styles.css) */
-
-    /* 1. Header */
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 1.25rem;
-    }
-
-    .header-titles {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.72rem;
-      color: #64748b;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .breadcrumb .sep {
-      color: #cbd5e1;
-    }
-
-    .breadcrumb .active-crumb {
-      color: #2563eb;
-      font-weight: 600;
-    }
-
-    .title-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .page-title {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: #0f172a;
-      letter-spacing: -0.03em;
-      margin: 0;
-    }
-
-    .status-pills-group {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.22rem 0.65rem;
-      border-radius: 20px;
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    .blue-pill {
-      background: #eff6ff;
-      border: 1px solid #dbeafe;
-      color: #1e40af;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-    }
-
-    .pill-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-
-    .blue-dot {
-      background: #2563eb;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .btn-action-outline {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 0.5rem 0.95rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-      font-family: inherit;
-    }
-
-    .btn-action-outline:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-      transform: translateY(-1px);
     }
 
     /* 2. KPIs Grid */
@@ -810,20 +669,12 @@ interface RecentEmployee {
       border-radius: 50%;
     }
 
-    .sub-dot.blue {
-      background: #2563eb;
-    }
-
     .sub-dot.green {
       background: #10b981;
     }
 
     .sub-dot.red {
       background: #ef4444;
-    }
-
-    .attendance-rate {
-      color: #2563eb;
     }
 
     .kpi-icon-box {
@@ -858,7 +709,6 @@ interface RecentEmployee {
       gap: 1.15rem;
     }
 
-    /* Formulario */
     .form-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
@@ -908,17 +758,6 @@ interface RecentEmployee {
       margin: 0.15rem 0 0;
     }
 
-    .step-badge {
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: #64748b;
-      background: #f1f5f9;
-      padding: 0.2rem 0.55rem;
-      border-radius: 4px;
-      border: 1px solid #e2e8f0;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
     .validation-callout-box {
       background: #f0f7ff;
       border: 1px solid #bfdbfe;
@@ -941,18 +780,6 @@ interface RecentEmployee {
     .callout-inputs-row {
       display: flex;
       gap: 0.6rem;
-    }
-
-    .select-doc-type {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 0.45rem 0.65rem;
-      font-size: 0.78rem;
-      color: #1e293b;
-      font-weight: 600;
-      outline: none;
-      font-family: inherit;
     }
 
     .input-doc-number {
@@ -1019,10 +846,6 @@ interface RecentEmployee {
       grid-template-columns: 1fr 1fr;
     }
 
-    .three-cols {
-      grid-template-columns: 1fr 1fr 1fr;
-    }
-
     .input-field-group {
       display: flex;
       flex-direction: column;
@@ -1035,7 +858,7 @@ interface RecentEmployee {
       color: #334155;
     }
 
-    .form-input, .form-select {
+    .form-input {
       background: #ffffff;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
@@ -1048,7 +871,7 @@ interface RecentEmployee {
       transition: all 0.18s ease;
     }
 
-    .form-input:focus, .form-select:focus {
+    .form-input:focus {
       border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
@@ -1061,37 +884,11 @@ interface RecentEmployee {
 
     .input-with-end-icon input {
       width: 100%;
-      padding-right: 2rem;
-    }
-
-    .end-icon {
-      position: absolute;
-      right: 0.65rem;
     }
 
     .field-hint {
       font-size: 0.68rem;
       color: #64748b;
-    }
-
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.25rem 0;
-    }
-
-    .checkbox-input {
-      width: 16px;
-      height: 16px;
-      accent-color: #2563eb;
-      cursor: pointer;
-    }
-
-    .checkbox-row label {
-      font-size: 0.74rem;
-      color: #334155;
-      cursor: pointer;
     }
 
     .form-actions-row {
@@ -1110,7 +907,7 @@ interface RecentEmployee {
       gap: 0.6rem;
     }
 
-    .btn-cancel, .btn-draft {
+    .btn-cancel {
       background: #ffffff;
       border: 1px solid #cbd5e1;
       color: #475569;
@@ -1123,7 +920,7 @@ interface RecentEmployee {
       font-family: inherit;
     }
 
-    .btn-cancel:hover, .btn-draft:hover {
+    .btn-cancel:hover {
       background: #f8fafc;
       border-color: #94a3b8;
     }
@@ -1157,7 +954,7 @@ interface RecentEmployee {
       gap: 1.15rem;
     }
 
-    .profile-card, .distribution-card {
+    .profile-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
       border-radius: 12px;
@@ -1200,11 +997,24 @@ interface RecentEmployee {
       color: #059669;
     }
 
+    .gray-badge {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #475569;
+    }
+
     .green-dot {
       width: 5px;
       height: 5px;
       border-radius: 50%;
       background: #10b981;
+    }
+
+    .gray-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #64748b;
     }
 
     .profile-main-block {
@@ -1304,12 +1114,6 @@ interface RecentEmployee {
       margin: 0;
     }
 
-    .profile-wh {
-      font-size: 0.68rem;
-      color: #64748b;
-      margin: 0;
-    }
-
     .tech-specs-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1341,52 +1145,6 @@ interface RecentEmployee {
       font-family: 'JetBrains Mono', monospace;
     }
 
-    .link-val {
-      color: #2563eb;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-
-    .progress-section {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .progress-meta-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.68rem;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .progress-title {
-      color: #64748b;
-      font-weight: 600;
-    }
-
-    .progress-percent {
-      color: #0f172a;
-      font-weight: 700;
-    }
-
-    .bar-container {
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #3b82f6, #2563eb);
-      border-radius: 6px;
-    }
-
-    .full-fill {
-      width: 100%;
-    }
-
     .profile-card-actions {
       display: flex;
       align-items: center;
@@ -1416,23 +1174,6 @@ interface RecentEmployee {
       border-color: #94a3b8;
     }
 
-    .btn-icon-danger {
-      background: #ffffff;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      padding: 0.45rem 0.55rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s ease;
-    }
-
-    .btn-icon-danger:hover {
-      background: #fee2e2;
-    }
-
-    /* Header Status Controls & Toggle Badge */
     .header-status-controls {
       display: flex;
       align-items: center;
@@ -1501,16 +1242,6 @@ interface RecentEmployee {
       background: #fef2f2 !important;
     }
 
-    .btn-outline-success {
-      border-color: #a7f3d0 !important;
-      color: #059669 !important;
-    }
-
-    .btn-outline-success:hover {
-      background: #ecfdf5 !important;
-    }
-
-    /* Formulario de Edición dentro de la Tarjeta */
     .edit-active-card-form {
       display: flex;
       flex-direction: column;
@@ -1639,7 +1370,6 @@ interface RecentEmployee {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      animation: fz-fadeIn 0.15s ease-out;
     }
 
     .role-dropdown-header {
@@ -1732,7 +1462,7 @@ interface RecentEmployee {
       color: #1e40af;
     }
 
-    /* 4. Tabla de Registros Recientes */
+    /* 4. Tabla de Empleados */
     .table-card {
       background: #ffffff;
       border: 1px solid rgba(226, 232, 240, 0.85);
@@ -1786,7 +1516,7 @@ interface RecentEmployee {
       border-radius: 8px;
       padding: 0.4rem 0.75rem;
       gap: 0.45rem;
-      width: 220px;
+      width: 240px;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
@@ -1798,28 +1528,6 @@ interface RecentEmployee {
       color: #0f172a;
       width: 100%;
       font-family: inherit;
-    }
-
-    .btn-export-table {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0.45rem 0.85rem;
-      font-size: 0.76rem;
-      font-weight: 600;
-      color: #334155;
-      cursor: pointer;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      transition: all 0.15s ease;
-      font-family: inherit;
-    }
-
-    .btn-export-table:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
     }
 
     .table-wrapper {
@@ -1909,11 +1617,6 @@ interface RecentEmployee {
       color: #1e293b;
     }
 
-    .location-text {
-      font-size: 0.74rem;
-      color: #475569;
-    }
-
     .status-cell-badge {
       display: inline-flex;
       align-items: center;
@@ -1950,10 +1653,10 @@ interface RecentEmployee {
     }
 
     .table-action-btn {
-      background: transparent;
-      border: 1px solid transparent;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       padding: 0.35rem;
-      border-radius: 4px;
+      border-radius: 6px;
       color: #64748b;
       cursor: pointer;
       display: flex;
@@ -1965,7 +1668,7 @@ interface RecentEmployee {
     .table-action-btn:hover {
       background: #f1f5f9;
       color: #0f172a;
-      border-color: #e2e8f0;
+      border-color: #cbd5e1;
     }
 
     .table-footer {
@@ -1982,50 +1685,6 @@ interface RecentEmployee {
       font-size: 0.73rem;
       color: #64748b;
       font-family: 'JetBrains Mono', monospace;
-    }
-
-    .pagination-buttons {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-page-nav {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 0.32rem 0.7rem;
-      font-size: 0.74rem;
-      color: #64748b;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .btn-page-nav:hover {
-      background: #f8fafc;
-      color: #0f172a;
-    }
-
-    .btn-page-num {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      border-radius: 6px;
-      font-size: 0.74rem;
-      color: #64748b;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .btn-page-num.active {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: #ffffff;
-      font-weight: 700;
     }
 
     .searching-spinner-box {
@@ -2066,7 +1725,6 @@ interface RecentEmployee {
       line-height: 1.4;
     }
 
-    /* Responsive */
     @media (max-width: 1024px) {
       .kpi-grid {
         grid-template-columns: 1fr;
@@ -2074,7 +1732,7 @@ interface RecentEmployee {
       .main-split-grid {
         grid-template-columns: 1fr;
       }
-      .two-cols, .three-cols {
+      .two-cols {
         grid-template-columns: 1fr;
       }
     }
@@ -2223,8 +1881,6 @@ export class EmployeesComponent implements OnInit {
 
   employeesList: RecentEmployee[] = [];
 
-  constructor() {}
-
   ngOnInit(): void {
     if (this.authService.isEmployee()) {
       this.router.navigate(['/app/employee-dashboard']);
@@ -2257,12 +1913,11 @@ export class EmployeesComponent implements OnInit {
   }
 
   fetchEmployeesFromApi(): void {
-    console.log('[Colaboradores] Obteniendo empleados desde la base de datos...');
     this.employeeService.getEmployees().subscribe({
       next: (data) => {
-        console.log('[Colaboradores] Registros obtenidos desde BD:', data);
         if (Array.isArray(data)) {
-          const mapped: RecentEmployee[] = data.map(item => ({
+          this.employeesList = data.map(item => ({
+            rawId: item.id,
             id: `EMP-${item.id}`,
             name: item.fullName,
             phone: item.phone,
@@ -2272,10 +1927,11 @@ export class EmployeesComponent implements OnInit {
             documentType: 'Doc',
             documentNumber: item.documentNumber,
             role: item.role || 'Colaborador',
+            isActive: item.isActive,
+            createdAt: item.createdAt,
             status: item.isActive ? 'Activo / Registrado' : 'Inactivo',
             statusClass: item.isActive ? 'active' : 'pending'
           }));
-          this.employeesList = mapped;
         }
         this.cdr.detectChanges();
       },
@@ -2300,10 +1956,71 @@ export class EmployeesComponent implements OnInit {
     );
   }
 
-  /**
-   * Búsqueda por Cédula mediante GET al servicio EmployeeService.
-   * Si es encontrado, lo muestra en el recuadro derecho.
-   */
+  onSelectEmployeeFromTable(emp: RecentEmployee): void {
+    this.isEditingActive = false;
+    this.activeEmployee = {
+      id: emp.rawId,
+      documentNumber: emp.documentNumber,
+      fullName: emp.name,
+      phone: emp.phone || '',
+      role: emp.role,
+      isActive: emp.isActive,
+      createdAt: emp.createdAt || ''
+    };
+    this.cdr.detectChanges();
+  }
+
+  async onDeleteEmployeeFromTable(emp: RecentEmployee): Promise<void> {
+    await this.confirmAndDeleteEmployee(emp.rawId, emp.name);
+  }
+
+  async onDeleteActiveEmployee(): Promise<void> {
+    if (!this.activeEmployee) return;
+    await this.confirmAndDeleteEmployee(this.activeEmployee.id, this.activeEmployee.fullName);
+  }
+
+  private async confirmAndDeleteEmployee(id: number, name: string): Promise<void> {
+    const res = await Swal.fire({
+      title: '¿Eliminar empleado?',
+      text: `¿Estás seguro de que deseas eliminar a "${name}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!res.isConfirmed) return;
+
+    this.employeeService.deleteEmployee(id).subscribe({
+      next: () => {
+        this.employeesList = this.employeesList.filter(e => e.rawId !== id);
+        if (this.activeEmployee?.id === id) {
+          this.activeEmployee = null;
+          this.isEditingActive = false;
+        }
+        Swal.fire({
+          position: 'top-end',
+          icon: 'success',
+          title: 'Empleado eliminado correctamente',
+          showConfirmButton: false,
+          timer: 1500
+        });
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        Swal.fire({
+          position: 'top-end',
+          icon: 'warning',
+          title: err?.error?.message || 'No se pudo eliminar el empleado',
+          showConfirmButton: false,
+          timer: 2000
+        });
+      }
+    });
+  }
+
   onSearchEmployeeByDocument(): void {
     const cleanDoc = this.searchDocumentInput.trim();
     if (!cleanDoc) {
@@ -2321,8 +2038,9 @@ export class EmployeesComponent implements OnInit {
     this.employeeService.getEmployeeByDocument(cleanDoc).subscribe({
       next: (employee: EmployeeDto) => {
         this.isSearching = false;
+        this.isEditingActive = false;
         this.activeEmployee = employee;
-        this.successMessage = `Colaborador "${employee.fullName}" encontrado con éxito y cargado en el panel derecho.`;
+        this.successMessage = `Colaborador "${employee.fullName}" encontrado con éxito.`;
         this.cdr.detectChanges();
       },
       error: (err: any) => {
@@ -2344,24 +2062,6 @@ export class EmployeesComponent implements OnInit {
     this.successMessage = '';
   }
 
-  onSaveDraft(): void {
-    alert('Borrador guardado localmente.');
-  }
-
-  onUseActiveInForm(): void {
-    if (this.activeEmployee) {
-      this.formName = this.activeEmployee.fullName;
-      this.formPhone = this.activeEmployee.phone || '';
-      this.formDocumentNumber = this.activeEmployee.documentNumber;
-      this.formRole = this.activeEmployee.role;
-      this.successMessage = `Datos de "${this.activeEmployee.fullName}" cargados en el formulario.`;
-    }
-  }
-
-  /**
-   * Registro de empleado mediante POST hacia la base de datos a través de EmployeeService.
-   * Al registrarse con éxito, actualiza inmediatamente el recuadro derecho.
-   */
   onRegisterEmployee(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -2414,11 +2114,11 @@ export class EmployeesComponent implements OnInit {
 
     this.isLoading = true;
 
-    // Realizar POST mediante el servicio EmployeeService
     this.employeeService.createEmployee(payload).subscribe({
       next: (response: EmployeeDto) => {
         this.isLoading = false;
-        this.activeEmployee = response; // Mostrar inmediatamente el nuevo empleado en el recuadro derecho
+        this.isEditingActive = false;
+        this.activeEmployee = response;
         this.successMessage = `Empleado "${response.fullName}" registrado con éxito en la base de datos.`;
 
         Swal.fire({
@@ -2430,7 +2130,8 @@ export class EmployeesComponent implements OnInit {
         });
 
         const newEmp: RecentEmployee = {
-          id: `EMP-${response.id || Math.floor(Math.random() * 900 + 100)}`,
+          rawId: response.id,
+          id: `EMP-${response.id}`,
           name: response.fullName,
           phone: response.phone,
           email: response.phone ? `Tel: ${response.phone}` : 'Sin teléfono',
@@ -2439,6 +2140,8 @@ export class EmployeesComponent implements OnInit {
           documentType: 'Doc',
           documentNumber: response.documentNumber,
           role: response.role,
+          isActive: response.isActive,
+          createdAt: response.createdAt,
           status: response.isActive ? 'Activo / Registrado' : 'Inactivo',
           statusClass: response.isActive ? 'active' : 'pending'
         };
@@ -2519,12 +2222,13 @@ export class EmployeesComponent implements OnInit {
           this.activeEmployee.isActive = payload.isActive;
         }
 
-        const idx = this.employeesList.findIndex(e => e.id === `EMP-${this.activeEmployee?.id}`);
+        const idx = this.employeesList.findIndex(e => e.rawId === this.activeEmployee?.id);
         if (idx !== -1 && this.activeEmployee) {
           this.employeesList[idx].name = this.activeEmployee.fullName;
           this.employeesList[idx].phone = this.activeEmployee.phone;
           this.employeesList[idx].email = this.activeEmployee.phone ? `Tel: ${this.activeEmployee.phone}` : 'Sin teléfono';
           this.employeesList[idx].role = this.activeEmployee.role;
+          this.employeesList[idx].isActive = this.activeEmployee.isActive;
           this.employeesList[idx].status = this.activeEmployee.isActive ? 'Activo / Registrado' : 'Inactivo';
           this.employeesList[idx].statusClass = this.activeEmployee.isActive ? 'active' : 'pending';
         }
@@ -2561,8 +2265,9 @@ export class EmployeesComponent implements OnInit {
           this.activeEmployee.isActive = newStatus;
         }
 
-        const idx = this.employeesList.findIndex(e => e.id === `EMP-${this.activeEmployee?.id}`);
+        const idx = this.employeesList.findIndex(e => e.rawId === this.activeEmployee?.id);
         if (idx !== -1 && this.activeEmployee) {
+          this.employeesList[idx].isActive = newStatus;
           this.employeesList[idx].status = newStatus ? 'Activo / Registrado' : 'Inactivo';
           this.employeesList[idx].statusClass = newStatus ? 'active' : 'pending';
         }

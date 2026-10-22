@@ -19,7 +19,9 @@ namespace Firmeza.Api.Controllers;
 public class ProductsController(
     UserManager<ApplicationUser> userManager,
     IEmployeeRepository employeeRepository,
-    IProductRepository productRepository) : ControllerBase
+    IProductRepository productRepository,
+    IEnterpriseRepository enterpriseRepository,
+    IProductBulkImportService bulkImportService) : ControllerBase
 {
     private async Task<string> ResolveRegisteredByNameAsync(Product p, CancellationToken cancellationToken)
     {
@@ -72,6 +74,7 @@ public class ProductsController(
         p.RegisteredById,
         registeredByName,
         p.EnterpriseId,
+        p.Enterprise?.BusinessName ?? (!string.IsNullOrWhiteSpace(registeredByName) ? registeredByName : "Ferretería General"),
         p.CreatedAt,
         p.UpdatedAt
     );
@@ -205,6 +208,84 @@ public class ProductsController(
         await productRepository.AddAsync(product, cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, MapToDto(product, registeredByName));
+    }
+
+    /// <summary>
+    /// Importación masiva de inventario a partir de la plantilla oficial (Excel / CSV convertido a JSON en el cliente).
+    /// La empresa y el usuario responsable se resuelven desde el token JWT; nunca se aceptan desde el body.
+    /// Validaciones: DataAnnotations del DTO (400), tamaño máximo 10 MB (413) y rol distinto de Client (403, middleware).
+    /// </summary>
+    [HttpPost("bulk-import")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    [ProducesResponseType(typeof(BulkImportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    public async Task<IActionResult> BulkImport(
+        [FromBody] BulkImportRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var actor = await ResolveImportActorAsync(cancellationToken);
+        if (actor is null)
+        {
+            return Unauthorized(new { message = "No fue posible identificar al usuario o a su empresa a partir del token." });
+        }
+
+        var result = await bulkImportService.ImportAsync(request, actor, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Resuelve la identidad del usuario autenticado y su empresa:
+    /// - Cuenta Identity (Empresa): EnterpriseId desde la empresa asociada a su correo.
+    /// - Empleado ({documento}@firmeza.internal): EnterpriseId desde el registro del empleado.
+    /// </summary>
+    private async Task<ImportActorContext?> ResolveImportActorAsync(CancellationToken cancellationToken)
+    {
+        var email = User.FindFirstValue(ClaimTypes.Email)
+            ?? User.FindFirstValue("email")
+            ?? User.Identity?.Name;
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is not null)
+        {
+            if (!Guid.TryParse(user.Id, out var userGuid))
+            {
+                userGuid = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var subGuid)
+                    ? subGuid
+                    : Guid.NewGuid();
+            }
+
+            var userName = !string.IsNullOrWhiteSpace(user.FullName)
+                ? user.FullName
+                : (user.Email ?? "Administrador");
+
+            var enterprise = await enterpriseRepository.GetByEmailAsync(email);
+            return new ImportActorContext(userGuid, userName, enterprise?.Id);
+        }
+
+        var docNumber = email.Split('@')[0];
+        var employee = await employeeRepository.GetByDocumentNumberAsync(docNumber, cancellationToken);
+
+        if (employee is null && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var empId))
+        {
+            employee = await employeeRepository.GetByIdAsync(empId, cancellationToken);
+        }
+
+        if (employee is null)
+        {
+            return null;
+        }
+
+        // Mismo esquema de Guid que usa Create para identificar empleados
+        var employeeGuid = new Guid(employee.Id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        return new ImportActorContext(employeeGuid, employee.FullName, employee.EnterpriseId);
     }
 
     /// <summary>

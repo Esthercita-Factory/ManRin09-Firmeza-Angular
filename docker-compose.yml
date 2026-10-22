@@ -59,6 +59,21 @@ services:
     networks:
       - firmeza-net
 
+  # 4. Frontend E-commerce (React + Tailwind / Nginx)
+  ecommerce:
+    build:
+      context: ./React
+      dockerfile: Dockerfile
+    image: firmeza-ecommerce:latest
+    container_name: firmeza-ecommerce
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - firmeza-net
+
 volumes:
   postgres_data:
     driver: local

@@ -63,6 +63,36 @@ export interface UpdateProductRequest {
   imageIcon?: string;
 }
 
+/** Fila de la plantilla oficial ya validada y normalizada (espejo de BulkImportProductItemDto). */
+export interface BulkImportProductItem {
+  sku: string;
+  name: string;
+  description?: string;
+  category: string;
+  stock: number;
+  costPrice: number;
+  salePrice: number;
+  location?: string;
+  minStock?: number;
+}
+
+/** Estrategia cuando un SKU ya existe: sumar cantidad o sobrescribir datos. */
+export type BulkImportConflictMode = 'SumStock' | 'Overwrite';
+
+export interface BulkImportRequest {
+  products: BulkImportProductItem[];
+  conflictMode: BulkImportConflictMode;
+}
+
+export interface BulkImportResult {
+  totalReceived: number;
+  totalProcessed: number;
+  totalCreated: number;
+  totalUpdated: number;
+  conflictMode: BulkImportConflictMode;
+  warnings: string[];
+}
+
 /**
  * Servicio unificado de Productos e Inventario para la plataforma Firmeza.
  * Sincronización en tiempo real mediante Signals, BehaviorSubject,
@@ -311,6 +341,17 @@ export class ProductsService {
         const updatedList = current.map(p => (p.id === id || p.sku === id) ? updated : p);
         this.saveStoredProducts(updatedList);
       })
+    );
+  }
+
+  /**
+   * Envía el lote de productos validado al endpoint de importación masiva y,
+   * al terminar, refresca el catálogo para que la tabla y los KPIs reflejen los cambios.
+   * Los errores 400/401 los presenta el productInterceptor.
+   */
+  bulkImport(request: BulkImportRequest): Observable<BulkImportResult> {
+    return this.http.post<BulkImportResult>(`${this.apiUrl}/bulk-import`, request, { headers: this.getAuthHeaders() }).pipe(
+      switchMap((result) => this.getProducts().pipe(map(() => result)))
     );
   }
 

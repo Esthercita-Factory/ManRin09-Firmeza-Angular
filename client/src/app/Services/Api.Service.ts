@@ -3,6 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 
+export interface PlanDto {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  precioMensual: number;
+  precioAnual: number;
+  caracteristicas: string[];
+  esRecomendado: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -17,6 +27,10 @@ export class ApiService {
 
   getDashboardData(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/dashboard`);
+  }
+
+  getPlans(): Observable<PlanDto[]> {
+    return this.http.get<PlanDto[]>(`${this.baseUrl}/plans`);
   }
 
   login(credentials: any): Observable<any> {

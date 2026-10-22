@@ -1,32 +1,11 @@
-import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
 import { AuthService } from '../../Services/auth.service';
-import { ProductsService, ProductItem } from '../../Services/products.service';
-
-interface ReplenishmentItem {
-  percent: number;
-  percentClass: 'pink' | 'red' | 'blue';
-  name: string;
-  sku: string;
-  statusNote: string;
-  isTotalStockout?: boolean;
-  min: number;
-  order: number;
-  buttonText: 'Emitir PO' | 'Urgente';
-  buttonClass: 'blue-po' | 'red-urgent';
-}
-
-interface BatchExpiryItem {
-  iconType: 'flask' | 'paint' | 'chemistry';
-  name: string;
-  daysRemaining: number;
-  daysClass: 'red-days' | 'normal-days';
-  batchCode: string;
-  quantity: string;
-}
+import { ProductsService, ProductItem, BulkImportConflictMode, BulkImportResult } from '../../Services/products.service';
+import { InventoryImportService, ImportFileError, ParsedImportFile } from '../../Services/inventory-import.service';
 
 @Component({
   selector: 'app-inventory',
@@ -34,7 +13,7 @@ interface BatchExpiryItem {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="fz-viewport">
-      <!-- 1. Encabezado (formato Dashboard / Inicio) -->
+      <!-- 1. Encabezado -->
       <header class="fz-header">
         <div class="fz-header-left">
           <div class="fz-header-icon">
@@ -49,41 +28,49 @@ interface BatchExpiryItem {
               <h1 class="fz-page-title">Catálogo de Inventario y Control de Stock</h1>
               <span class="fz-live-pill">
                 <span class="fz-pulse-dot"></span>
-                Escaneo RFID activo
+                Sincronizado con BD
               </span>
             </div>
             <div class="fz-subtitle">
-              <span>Almacén Central (WH-01)</span>
-              <span class="fz-sep">•</span>
-              <span>Sincronización en tiempo real</span>
+              <span>Gestión de productos, ubicaciones, precios y niveles de stock</span>
             </div>
           </div>
         </div>
 
         <div class="fz-header-actions">
-          <button class="fz-btn fz-btn-outline">
+          <button class="fz-btn fz-btn-outline" (click)="loadProducts()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>Actualizar</span>
+          </button>
+
+          <button class="fz-btn fz-btn-outline" (click)="downloadImportTemplate()" title="Descargar la plantilla oficial de inventario (.xlsx)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span>Descargar CSV / PDF</span>
+            <span>Descargar Plantilla</span>
           </button>
 
-          <button class="fz-btn fz-btn-dark">
+          <button class="fz-btn fz-btn-outline" (click)="triggerImportFile()" [disabled]="isImporting" title="Importar productos desde la plantilla oficial (.xlsx, .xls, .csv)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="4" y1="21" x2="4" y2="14"></line>
-              <line x1="4" y1="10" x2="4" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12" y2="3"></line>
-              <line x1="20" y1="21" x2="20" y2="16"></line>
-              <line x1="20" y1="12" x2="20" y2="3"></line>
-              <line x1="1" y1="14" x2="7" y2="14"></line>
-              <line x1="9" y1="8" x2="15" y2="8"></line>
-              <line x1="17" y1="16" x2="23" y2="16"></line>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            <span>Ajuste Rápido</span>
+            <span>{{ isImporting ? 'Importando...' : 'Importar Excel / CSV' }}</span>
           </button>
+          <input
+            #importFileInput
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            hidden
+            (change)="onImportFileSelected($event)"
+          />
 
           <button class="fz-btn fz-btn-primary" (click)="openNewProductModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
@@ -171,7 +158,7 @@ interface BatchExpiryItem {
             <span class="rot-text" *ngIf="lowStockCount === 0">
               Stock en niveles óptimos
             </span>
-            <span class="quiebre-text">{{ stockoutCount }} en quiebre</span>
+            <span class="quiebre-text">{{ stockoutCount }} agotados</span>
           </div>
         </div>
       </section>
@@ -186,14 +173,9 @@ interface BatchExpiryItem {
           <input 
             type="text" 
             [(ngModel)]="searchQuery" 
-            placeholder="Buscar por SKU, nombre, lote..." 
+            placeholder="Buscar por SKU, código de barras o nombre..." 
             class="search-input" 
           />
-          <div class="barcode-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14"/>
-            </svg>
-          </div>
         </div>
 
         <div class="dropdowns-group">
@@ -206,7 +188,7 @@ interface BatchExpiryItem {
 
           <div class="filter-dropdown-wrapper">
             <select [(ngModel)]="selectedLocation" class="filter-dropdown">
-              <option value="all">Ubicación: Todas las Naves</option>
+              <option value="all">Ubicación: Todas</option>
               <option *ngFor="let loc of availableLocations" [value]="loc">{{ loc }}</option>
             </select>
           </div>
@@ -221,32 +203,6 @@ interface BatchExpiryItem {
             </select>
           </div>
         </div>
-
-        <div class="view-toggles-group">
-          <button class="btn-toggle active" title="Vista Tabla">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="8" y1="6" x2="21" y2="6"></line>
-              <line x1="8" y1="12" x2="21" y2="12"></line>
-              <line x1="8" y1="18" x2="21" y2="18"></line>
-              <line x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-          </button>
-          <button class="btn-toggle" title="Vista Cuadrícula">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"></rect>
-              <rect x="14" y="3" width="7" height="7"></rect>
-              <rect x="14" y="14" width="7" height="7"></rect>
-              <rect x="3" y="14" width="7" height="7"></rect>
-            </svg>
-          </button>
-          <button class="btn-toggle" title="Filtros Avanzados">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-          </button>
-        </div>
       </section>
 
       <!-- 4. Tabla de Catálogo de Productos y Control de Stock -->
@@ -255,9 +211,6 @@ interface BatchExpiryItem {
           <table class="inventory-table">
             <thead>
               <tr>
-                <th class="th-checkbox">
-                  <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" class="custom-checkbox" />
-                </th>
                 <th>SKU / CÓD. BARRAS</th>
                 <th>PRODUCTO Y CATEGORÍA</th>
                 <th>UBICACIÓN BODEGA</th>
@@ -269,10 +222,7 @@ interface BatchExpiryItem {
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let item of filteredProducts; trackBy: trackBySku" [class.selected-row]="item.selected">
-                <td class="td-checkbox">
-                  <input type="checkbox" [(ngModel)]="item.selected" class="custom-checkbox" />
-                </td>
+              <tr *ngFor="let item of filteredProducts; trackBy: trackBySku">
                 <td>
                   <div class="sku-cell">
                     <span class="sku-code">{{ item.sku }}</span>
@@ -306,7 +256,7 @@ interface BatchExpiryItem {
                   <div class="stock-cell">
                     <div style="display: flex; align-items: center; gap: 0.35rem;">
                       <span class="stock-main" [class.text-critical]="isUnderFive(item)">{{ item.stockTotal }}</span>
-                      <span *ngIf="isUnderFive(item)" class="badge-critical-tag">⚠️ &lt; 5 CRÍTICO</span>
+                      <span *ngIf="isUnderFive(item)" class="badge-critical-tag">⚠️ &lt; {{ item.minStock || 5 }} CRÍTICO</span>
                     </div>
                     <span class="stock-sub" [class.text-critical]="isUnderFive(item)">
                       {{ item.stockReserved }} resv. ({{ item.stockAvailable }} disp.)
@@ -366,8 +316,8 @@ interface BatchExpiryItem {
                 </td>
               </tr>
               <tr *ngIf="filteredProducts.length === 0">
-                <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
-                  No hay productos registrados en el inventario. Utilice "Nuevo Producto" para registrar datos.
+                <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                  No hay productos que coincidan con la búsqueda o filtros seleccionados. Utilice "Nuevo Producto" para registrar artículos.
                 </td>
               </tr>
             </tbody>
@@ -376,140 +326,7 @@ interface BatchExpiryItem {
 
         <div class="table-footer">
           <div class="footer-left">
-            <span class="showing-text">Mostrando <strong>{{ filteredProducts.length > 0 ? '1 - ' + filteredProducts.length : '0' }}</strong> de <strong>{{ products.length | number }}</strong> SKUs activos</span>
-            <span class="sep-dot">•</span>
-            <div class="rows-per-page">
-              <span>Filas por pág:</span>
-              <select class="rows-select">
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="pagination-controls">
-            <button class="btn-pag-edge" title="Primera página">&lt;&lt;</button>
-            <button class="btn-pag-edge" title="Página anterior">&lt;</button>
-            <button class="btn-pag-num active">1</button>
-            <button class="btn-pag-num">2</button>
-            <button class="btn-pag-num">3</button>
-            <span class="pag-ellipsis">...</span>
-            <button class="btn-pag-num">497</button>
-            <button class="btn-pag-edge" title="Página siguiente">&gt;</button>
-            <button class="btn-pag-edge" title="Última página">&gt;&gt;</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- 5. Sección Inferior: Reposición Prioritaria & Lotes por Vencer -->
-      <section class="bottom-split-grid">
-        <!-- Tarjeta Izquierda: Cola de Reposición Prioritaria Inmediata -->
-        <div class="reposition-card">
-          <div class="reposition-header">
-            <div class="reposition-titles">
-              <div class="reposition-title-group">
-                <div class="icon-warning-box">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                  </svg>
-                </div>
-                <h3 class="reposition-title">Cola de Reposición Prioritaria Inmediata</h3>
-              </div>
-              <p class="reposition-subtitle">Materiales bajo punto de seguridad que afectan órdenes comprometidas</p>
-            </div>
-            <a href="#" class="link-global-po" (click)="$event.preventDefault()">
-              <span>Generar O/C Global</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </a>
-          </div>
-
-          <div class="reposition-items-list">
-            <div *ngIf="replenishmentQueue.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
-              No hay ítems en la cola de reposición inmediata.
-            </div>
-            <div *ngFor="let rep of replenishmentQueue" class="reposition-item">
-              <div class="percent-badge" [ngClass]="rep.percentClass">
-                {{ rep.percent }}%
-              </div>
-              <div class="rep-info">
-                <span class="rep-name">{{ rep.name }}</span>
-                <span class="rep-sub" [class.text-danger]="rep.isTotalStockout">{{ rep.statusNote }}</span>
-              </div>
-              <div class="rep-target">
-                <span class="target-text">Min: {{ rep.min }} | <strong>Pedir: {{ rep.order }}</strong></span>
-              </div>
-              <div class="rep-action">
-                <button class="btn-po" [ngClass]="rep.buttonClass" (click)="onActionPo(rep)">
-                  {{ rep.buttonText }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="reposition-footer">
-            <span class="mrp-note">Próxima corrida automática de compras MRP programada para las <strong>18:00 hrs</strong></span>
-            <a href="#" class="mrp-config-link" (click)="$event.preventDefault()">Configurar Reglas Min/Max</a>
-          </div>
-        </div>
-
-        <!-- Tarjeta Derecha: Lotes Próximos a Vencer -->
-        <div class="expiry-card">
-          <div class="expiry-header">
-            <div class="expiry-title-group">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-              <h3 class="expiry-title">Lotes Próximos a Vencer</h3>
-            </div>
-            <span class="bahia-pill">Bahía Química</span>
-          </div>
-
-          <div class="expiry-items-list">
-            <div *ngIf="expiryBatches.length === 0" style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
-              No hay lotes con fecha próxima de vencimiento registrados.
-            </div>
-            <div *ngFor="let batch of expiryBatches" class="expiry-item">
-              <div class="expiry-icon-col">
-                <svg *ngIf="batch.iconType === 'flask'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
-                  <path d="M10 2v7.31L4.69 19.5A2 2 0 0 0 6.44 22h11.12a2 2 0 0 0 1.75-2.5L14 9.31V2"></path>
-                </svg>
-                <svg *ngIf="batch.iconType === 'paint'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
-                  <path d="M19 11V4a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7"></path>
-                  <path d="M12 2v9"></path>
-                  <path d="M5 11h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8z"></path>
-                </svg>
-                <svg *ngIf="batch.iconType === 'chemistry'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
-                  <path d="M6 2v6h12V2"></path>
-                  <path d="M4 8l3 13h10l3-13"></path>
-                </svg>
-              </div>
-
-              <div class="expiry-main-info">
-                <div class="expiry-name-row">
-                  <span class="expiry-product-name">{{ batch.name }}</span>
-                  <span class="expiry-days-badge" [ngClass]="batch.daysClass">{{ batch.daysRemaining }} días</span>
-                </div>
-                <div class="expiry-batch-meta">
-                  <span>Lote <strong>{{ batch.batchCode }}</strong> • {{ batch.quantity }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="expiry-footer">
-            <button class="btn-fifo-inspect" (click)="onInspectFifo()">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              <span>Inspeccionar Protocolo FIFO/FEFO</span>
-            </button>
+            <span class="showing-text">Mostrando <strong>{{ filteredProducts.length }}</strong> de <strong>{{ products.length | number }}</strong> productos registrados en base de datos</span>
           </div>
         </div>
       </section>
@@ -526,8 +343,6 @@ interface BatchExpiryItem {
       -moz-osx-font-smoothing: grayscale;
       letter-spacing: -0.012em;
     }
-
-    /* El contenedor y el encabezado usan .fz-viewport / .fz-header (styles.css) */
 
     /* 2. KPIs Grid */
     .kpi-grid {
@@ -592,11 +407,6 @@ interface BatchExpiryItem {
     .red-tint {
       background: #fee2e2;
       border: 1px solid #fecaca;
-    }
-
-    .teal-tint {
-      background: #e0f2fe;
-      border: 1px solid #bae6fd;
     }
 
     .kpi-val-row {
@@ -666,16 +476,6 @@ interface BatchExpiryItem {
       color: #64748b;
     }
 
-    .naves-text {
-      color: #64748b;
-    }
-
-    .racks-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      color: #1e293b;
-    }
-
     /* 3. Filters Bar Card */
     .filters-bar-card {
       background: #ffffff;
@@ -698,7 +498,7 @@ interface BatchExpiryItem {
       border-radius: 8px;
       padding: 0.4rem 0.75rem;
       gap: 0.5rem;
-      width: 290px;
+      width: 320px;
       transition: all 0.2s ease;
     }
 
@@ -716,12 +516,6 @@ interface BatchExpiryItem {
       color: #0f172a;
       width: 100%;
       font-family: inherit;
-    }
-
-    .barcode-badge {
-      display: flex;
-      align-items: center;
-      color: #94a3b8;
     }
 
     .dropdowns-group {
@@ -758,36 +552,6 @@ interface BatchExpiryItem {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .view-toggles-group {
-      display: flex;
-      align-items: center;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #ffffff;
-    }
-
-    .btn-toggle {
-      border: none;
-      background: transparent;
-      padding: 0.45rem 0.65rem;
-      color: #64748b;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s ease;
-    }
-
-    .btn-toggle:not(:last-child) {
-      border-right: 1px solid #e2e8f0;
-    }
-
-    .btn-toggle.active {
-      background: #eff6ff;
-      color: #2563eb;
-    }
-
     /* 4. Table Card */
     .table-card {
       background: #ffffff;
@@ -821,19 +585,6 @@ interface BatchExpiryItem {
       font-family: 'JetBrains Mono', monospace;
     }
 
-    .th-checkbox, .td-checkbox {
-      width: 36px;
-      text-align: center !important;
-      padding-left: 1rem !important;
-    }
-
-    .custom-checkbox {
-      width: 15px;
-      height: 15px;
-      accent-color: #2563eb;
-      cursor: pointer;
-    }
-
     .inventory-table td {
       padding: 0.85rem 0.95rem;
       border-bottom: 1px solid #f1f5f9;
@@ -843,10 +594,6 @@ interface BatchExpiryItem {
 
     .inventory-table tbody tr:hover td {
       background-color: #f8fafc;
-    }
-
-    .selected-row td {
-      background-color: #f0f7ff !important;
     }
 
     .sku-cell {
@@ -1113,386 +860,9 @@ interface BatchExpiryItem {
       color: #64748b;
     }
 
-    .sep-dot {
-      color: #cbd5e1;
-    }
-
-    .rows-per-page {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .rows-select {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      padding: 0.15rem 0.4rem;
-      font-size: 0.74rem;
-      color: #0f172a;
-      outline: none;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .btn-pag-edge, .btn-pag-num {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 0.74rem;
-      color: #475569;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-    }
-
-    .btn-pag-edge:hover, .btn-pag-num:hover:not(.active) {
-      background: #f1f5f9;
-      color: #0f172a;
-      border-color: #94a3b8;
-    }
-
-    .btn-pag-num.active {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: #ffffff;
-      font-weight: 700;
-    }
-
-    .pag-ellipsis {
-      padding: 0 0.25rem;
-      color: #94a3b8;
-    }
-
-    /* 5. Bottom Split Grid */
-    .bottom-split-grid {
-      display: grid;
-      grid-template-columns: 1.55fr 1fr;
-      gap: 1.15rem;
-    }
-
-    .reposition-card, .expiry-card {
-      background: #ffffff;
-      border: 1px solid rgba(226, 232, 240, 0.85);
-      border-radius: 12px;
-      padding: 1.25rem 1.4rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
-    }
-
-    .reposition-header, .expiry-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 0.75rem;
-    }
-
-    .reposition-title-group, .expiry-title-group {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .icon-warning-box {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      background: #fee2e2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .reposition-title, .expiry-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #0f172a;
-      letter-spacing: -0.02em;
-      margin: 0;
-    }
-
-    .reposition-subtitle {
-      font-size: 0.71rem;
-      color: #64748b;
-      margin: 0.2rem 0 0;
-    }
-
-    .link-global-po {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      color: #2563eb;
-      font-size: 0.74rem;
-      font-weight: 700;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-
-    .link-global-po:hover {
-      text-decoration: underline;
-    }
-
-    .bahia-pill {
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 0.2rem 0.55rem;
-      font-size: 0.65rem;
-      font-family: 'JetBrains Mono', monospace;
-      color: #475569;
-      font-weight: 700;
-    }
-
-    .reposition-items-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    .reposition-item {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      background: #f8fafc;
-      border: 1px solid #f1f5f9;
-      border-radius: 8px;
-      padding: 0.65rem 0.85rem;
-      transition: all 0.15s ease;
-    }
-
-    .reposition-item:hover {
-      background: #ffffff;
-      border-color: #e2e8f0;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-    }
-
-    .percent-badge {
-      width: 42px;
-      height: 34px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.76rem;
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace;
-      flex-shrink: 0;
-    }
-
-    .percent-badge.pink {
-      background: #fee2e2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .percent-badge.red {
-      background: #fee2e2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .percent-badge.blue {
-      background: #eff6ff;
-      color: #2563eb;
-      border: 1px solid #dbeafe;
-    }
-
-    .rep-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-
-    .rep-name {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #0f172a;
-    }
-
-    .rep-sub {
-      font-size: 0.69rem;
-      color: #64748b;
-    }
-
-    .text-danger {
-      color: #dc2626 !important;
-      font-weight: 600;
-    }
-
-    .rep-target {
-      font-size: 0.72rem;
-      font-family: 'JetBrains Mono', monospace;
-      color: #475569;
-      white-space: nowrap;
-    }
-
-    .btn-po {
-      border: none;
-      border-radius: 6px;
-      padding: 0.4rem 0.85rem;
-      font-size: 0.74rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-      font-family: inherit;
-    }
-
-    .blue-po {
-      background: #2563eb;
-      color: #ffffff;
-      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
-    }
-
-    .blue-po:hover {
-      background: #1d4ed8;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
-    }
-
-    .red-urgent {
-      background: #dc2626;
-      color: #ffffff;
-      box-shadow: 0 1px 3px rgba(220, 38, 38, 0.25);
-    }
-
-    .red-urgent:hover {
-      background: #b91c1c;
-    }
-
-    .reposition-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 0.6rem;
-      border-top: 1px solid #f1f5f9;
-      font-size: 0.71rem;
-      color: #64748b;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .mrp-config-link {
-      color: #2563eb;
-      font-weight: 600;
-      text-decoration: underline;
-    }
-
-    /* Expiry Card */
-    .expiry-items-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    .expiry-item {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      padding: 0.6rem 0.75rem;
-      background: #f8fafc;
-      border: 1px solid #f1f5f9;
-      border-radius: 8px;
-    }
-
-    .expiry-icon-col {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .expiry-main-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-
-    .expiry-name-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .expiry-product-name {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #0f172a;
-    }
-
-    .expiry-days-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      font-weight: 700;
-    }
-
-    .red-days {
-      color: #dc2626;
-    }
-
-    .normal-days {
-      color: #0284c7;
-    }
-
-    .expiry-batch-meta {
-      font-size: 0.68rem;
-      color: #64748b;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .expiry-footer {
-      margin-top: auto;
-      padding-top: 0.6rem;
-    }
-
-    .btn-fifo-inspect {
-      width: 100%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0.55rem;
-      font-size: 0.76rem;
-      font-weight: 700;
-      color: #334155;
-      cursor: pointer;
-      transition: all 0.18s ease;
-      font-family: inherit;
-    }
-
-    .btn-fifo-inspect:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-    }
-
-    /* Responsive */
     @media (max-width: 1200px) {
       .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
-      }
-      .bottom-split-grid {
-        grid-template-columns: 1fr;
       }
     }
 
@@ -1515,6 +885,12 @@ export class InventoryComponent implements OnInit, OnDestroy {
   private readonly productsService = inject(ProductsService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly ngZone = inject(NgZone);
+  private readonly importService = inject(InventoryImportService);
+
+  @ViewChild('importFileInput') private importFileInput?: ElementRef<HTMLInputElement>;
+
+  /** Bloquea el botón de importación mientras se procesa un archivo. */
+  isImporting = false;
 
   private productsSub?: Subscription;
 
@@ -1522,11 +898,8 @@ export class InventoryComponent implements OnInit, OnDestroy {
   selectedCategory = 'all';
   selectedLocation = 'all';
   selectedStockLevel = 'all';
-  selectAll = false;
 
   products: ProductItem[] = [];
-  replenishmentQueue: ReplenishmentItem[] = [];
-  expiryBatches: BatchExpiryItem[] = [];
 
   get isEmployee(): boolean {
     return this.authService.isEmployee();
@@ -1619,39 +992,11 @@ export class InventoryComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  private updateReplenishmentQueue(): void {
-    this.replenishmentQueue = this.products
-      .filter(p => this.isUnderFive(p))
-      .map(p => {
-        const qty = this.getStockQuantity(p);
-        const min = p.minStock ?? 5;
-        const targetOrder = Math.max(min * 2 - qty, min);
-        const percent = min > 0 ? Math.min(100, Math.round((qty / min) * 100)) : 0;
-        const isStockout = qty <= 0;
-
-        return {
-          percent,
-          percentClass: isStockout ? 'red' : (percent <= 50 ? 'pink' : 'blue'),
-          name: p.name,
-          sku: p.sku,
-          statusNote: isStockout 
-            ? '¡QUIEBRE TOTAL! 0 unidades disponibles' 
-            : `Stock Crítico: ${qty} uds disponibles (Mínimo: ${min})`,
-          isTotalStockout: isStockout,
-          min,
-          order: targetOrder,
-          buttonText: isStockout ? 'Urgente' : 'Emitir PO',
-          buttonClass: isStockout ? 'red-urgent' : 'blue-po'
-        };
-      });
-  }
-
   loadProducts(): void {
-    console.log('[Inventario] Conectando suscripción en tiempo real...');
+    this.productsSub?.unsubscribe();
     this.productsSub = this.productsService.products$.subscribe((items) => {
       this.ngZone.run(() => {
         this.products = [...(items || [])];
-        this.updateReplenishmentQueue();
         this.cdr.detectChanges();
       });
     });
@@ -1660,7 +1005,6 @@ export class InventoryComponent implements OnInit, OnDestroy {
       next: (data) => {
         this.ngZone.run(() => {
           this.products = [...(data || [])];
-          this.updateReplenishmentQueue();
           this.cdr.detectChanges();
         });
       },
@@ -1702,10 +1046,6 @@ export class InventoryComponent implements OnInit, OnDestroy {
 
       return matchesSearch && matchesCategory && matchesLocation && matchesStockLevel;
     });
-  }
-
-  toggleSelectAll(): void {
-    this.products.forEach(p => p.selected = this.selectAll);
   }
 
   async openNewProductModal(): Promise<void> {
@@ -1750,7 +1090,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
             </div>
           </div>
 
-          <!-- Ubicación Bodega (Combobox con opciones existentes y posibilidad de escribir nueva) -->
+          <!-- Ubicación Bodega -->
           <div>
             <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación en Bodega * (máx 30)</label>
             <input id="swal-location" list="swal-locations-datalist" class="swal2-input" maxlength="30" placeholder="Selecciona o escribe: Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;" autocomplete="off">
@@ -1849,7 +1189,6 @@ export class InventoryComponent implements OnInit, OnDestroy {
           return false;
         }
 
-        // Si el usuario escribió la ubicación con diferente mayúscula/minúscula (ej: "nave a"), reutilizar la existente ("Nave A")
         const matchedLoc = this.availableLocations.find(l => l.toLowerCase() === location.toLowerCase());
         const finalLocation = matchedLoc || location;
 
@@ -1973,7 +1312,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
             </div>
           </div>
 
-          <!-- Ubicación Bodega (Combobox con opciones existentes y posibilidad de escribir nueva) -->
+          <!-- Ubicación Bodega -->
           <div>
             <label style="font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block;">Ubicación Bodega * (máx 30)</label>
             <input id="swal-edit-location" list="swal-edit-locations-datalist" class="swal2-input" maxlength="30" value="${item.location}" placeholder="Selecciona o escribe: Ej. Nave A-P03-R2" style="margin:0; width:100%; box-sizing:border-box; font-size:0.85rem;" autocomplete="off">
@@ -2058,7 +1397,6 @@ export class InventoryComponent implements OnInit, OnDestroy {
           return false;
         }
 
-        // Si el usuario escribió la ubicación con diferente mayúscula/minúscula (ej: "nave a"), reutilizar la existente ("Nave A")
         const matchedLoc = this.availableLocations.find(l => l.toLowerCase() === location.toLowerCase());
         const finalLocation = matchedLoc || location;
 
@@ -2184,11 +1522,221 @@ export class InventoryComponent implements OnInit, OnDestroy {
     }
   }
 
-  onActionPo(item: ReplenishmentItem): void {
-    alert(`Orden de Compra emitida para ${item.name} por ${item.order} unidades.`);
+  async downloadImportTemplate(): Promise<void> {
+    try {
+      await this.importService.downloadTemplate();
+    } catch {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al generar plantilla',
+        text: 'No fue posible descargar la plantilla oficial. Inténtalo nuevamente.',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#2563eb'
+      });
+    }
   }
 
-  onInspectFifo(): void {
-    alert('Protocolo FIFO/FEFO: Verificando trazabilidad y rotación de lotes con fecha próxima de vencimiento.');
+  triggerImportFile(): void {
+    if (this.isImporting) return;
+    const input = this.importFileInput?.nativeElement;
+    if (input) {
+      input.value = '';
+      input.click();
+    }
+  }
+
+  async onImportFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    try {
+      const parsed = await this.importService.parseFile(file);
+      await this.handleParsedImportFile(parsed);
+    } catch (err) {
+      if (err instanceof ImportFileError) {
+        const detailHtml = err.details.length > 0
+          ? `<ul style="text-align:left; margin:10px 0 0 0; padding-left:18px; font-size:0.86rem; color:#475569;">${err.details.map(d => `<li style="margin-bottom:4px;">${this.escapeHtml(d)}</li>`).join('')}</ul>`
+          : '';
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Archivo inválido',
+          html: `<div style="text-align:left; font-size:0.9rem; color:#1e293b;"><p style="margin:0; font-weight:600;">${this.escapeHtml(err.message)}</p>${detailHtml}</div>`,
+          confirmButtonText: 'Entendido',
+          confirmButtonColor: '#2563eb'
+        });
+      } else {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error al leer el archivo',
+          text: 'Ocurrió un problema inesperado al procesar el archivo seleccionado.',
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#2563eb'
+        });
+      }
+    } finally {
+      if (input) input.value = '';
+    }
+  }
+
+  private async handleParsedImportFile(parsed: ParsedImportFile): Promise<void> {
+    if (parsed.validItems.length === 0) {
+      const sampleErrors = parsed.rowErrors.slice(0, 8)
+        .map(r => `<li style="margin-bottom:4px;"><strong>Fila ${r.row}:</strong> ${this.escapeHtml(r.messages.join(' '))}</li>`)
+        .join('');
+      const extraCount = parsed.rowErrors.length - 8;
+      const extraNote = extraCount > 0 ? `<p style="margin:8px 0 0 0; font-size:0.8rem; color:#64748b;">...y ${extraCount} fila(s) más con errores.</p>` : '';
+
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Ninguna fila válida para importar',
+        html: `
+          <div style="text-align:left; font-size:0.88rem; color:#334155;">
+            <p style="margin:0 0 8px 0;">Se analizaron <strong>${parsed.totalRows}</strong> fila(s) en <strong>${this.escapeHtml(parsed.fileName)}</strong> y todas presentaron errores:</p>
+            <ul style="margin:0; padding-left:18px; color:#dc2626;">${sampleErrors}</ul>
+            ${extraNote}
+          </div>
+        `,
+        confirmButtonText: 'Revisar archivo',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
+
+    const previewRows = parsed.validItems.slice(0, 4)
+      .map(item => `
+        <tr>
+          <td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-family:monospace; font-size:0.78rem;">${this.escapeHtml(item.sku)}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:0.8rem;">${this.escapeHtml(item.name)}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:0.8rem;">${item.stock}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:0.8rem;">$${item.salePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+      `)
+      .join('');
+
+    const errorWarningHtml = parsed.rowErrors.length > 0
+      ? `
+        <div style="margin-top:10px; padding:8px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; font-size:0.8rem; color:#991b1b;">
+          <strong>Atención:</strong> ${parsed.rowErrors.length} fila(s) tienen errores y serán omitidas:
+          <ul style="margin:4px 0 0 0; padding-left:16px;">
+            ${parsed.rowErrors.slice(0, 4).map(r => `<li>Fila ${r.row}: ${this.escapeHtml(r.messages.join(' '))}</li>`).join('')}
+          </ul>
+        </div>
+      `
+      : '';
+
+    let selectedMode: BulkImportConflictMode = 'SumStock';
+
+    const confirmation = await Swal.fire({
+      title: 'Confirmar importación de inventario',
+      width: 600,
+      html: `
+        <div style="text-align:left; font-size:0.88rem; color:#334155;">
+          <p style="margin:0 0 10px 0;">
+            Archivo: <strong>${this.escapeHtml(parsed.fileName)}</strong><br/>
+            Productos válidos listos para importar: <strong>${parsed.validItems.length}</strong> de ${parsed.totalRows}
+          </p>
+          <table style="width:100%; border-collapse:collapse; margin-bottom:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+            <thead>
+              <tr style="background:#f1f5f9; font-size:0.75rem; text-transform:uppercase; color:#475569;">
+                <th style="padding:6px 8px; text-align:left;">SKU</th>
+                <th style="padding:6px 8px; text-align:left;">Nombre</th>
+                <th style="padding:6px 8px; text-align:right;">Cant.</th>
+                <th style="padding:6px 8px; text-align:right;">P. Venta</th>
+              </tr>
+            </thead>
+            <tbody>${previewRows}</tbody>
+          </table>
+          <label style="display:block; font-weight:600; margin-bottom:6px; color:#0f172a;">
+            Si un SKU del archivo ya existe en el inventario:
+          </label>
+          <select id="fz-import-conflict-mode" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.86rem; color:#0f172a; background:#ffffff;">
+            <option value="SumStock" selected>Sumar la cantidad al stock actual (conservar precios y datos actuales)</option>
+            <option value="Overwrite">Sobrescribir stock, precios y datos con los del archivo</option>
+          </select>
+          ${errorWarningHtml}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: `Importar ${parsed.validItems.length} producto(s)`,
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#94a3b8',
+      preConfirm: () => {
+        const selectEl = document.getElementById('fz-import-conflict-mode') as HTMLSelectElement | null;
+        if (selectEl && (selectEl.value === 'SumStock' || selectEl.value === 'Overwrite')) {
+          selectedMode = selectEl.value;
+        }
+        return selectedMode;
+      }
+    });
+
+    if (!confirmation.isConfirmed) return;
+
+    this.isImporting = true;
+    this.cdr.detectChanges();
+
+    this.productsService.bulkImport({
+      products: parsed.validItems,
+      conflictMode: selectedMode
+    }).subscribe({
+      next: (result: BulkImportResult) => {
+        this.ngZone.run(() => {
+          this.isImporting = false;
+          this.cdr.detectChanges();
+        });
+
+        const warningsHtml = result.warnings && result.warnings.length > 0
+          ? `<div style="margin-top:10px; padding:8px 10px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:0.8rem; color:#92400e; text-align:left;">
+              <strong>Avisos durante el proceso:</strong>
+              <ul style="margin:4px 0 0 0; padding-left:16px;">
+                ${result.warnings.slice(0, 5).map(w => `<li>${this.escapeHtml(w)}</li>`).join('')}
+              </ul>
+            </div>`
+          : '';
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Importación completada',
+          html: `
+            <div style="text-align:left; font-size:0.9rem; color:#334155;">
+              <p style="margin:0 0 6px 0;">Resumen del lote procesado:</p>
+              <ul style="margin:0; padding-left:18px;">
+                <li>Productos nuevos creados: <strong>${result.totalCreated}</strong></li>
+                <li>Productos existentes actualizados: <strong>${result.totalUpdated}</strong></li>
+                <li>Total procesados: <strong>${result.totalProcessed}</strong></li>
+              </ul>
+              ${warningsHtml}
+            </div>
+          `,
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#2563eb'
+        });
+      },
+      error: (err) => {
+        this.ngZone.run(() => {
+          this.isImporting = false;
+          this.cdr.detectChanges();
+        });
+        if (!err?.error?.handledByProductInterceptor) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error en la importación',
+            text: err?.error?.message || 'No fue posible completar la importación masiva.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#2563eb'
+          });
+        }
+      }
+    });
+  }
+
+  private escapeHtml(text: string): string {
+    return String(text ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

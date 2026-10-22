@@ -1,57 +1,41 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { ApiService, PlanDto } from '../../Services/Api.Service';
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-plans',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="fz-viewport">
       <!-- Top Navigation Bar -->
       <header class="top-nav">
-        <div class="nav-left">
-          <button class="menu-btn" type="button" aria-label="Menu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
+        <a routerLink="/" class="nav-left" style="text-decoration: none;">
           <div class="brand">
             <span class="brand-name">Firmeza</span>
             <span class="brand-sub">INVENTORY PLATFORM</span>
           </div>
-        </div>
+        </a>
 
         <div class="nav-right">
-          <div class="user-menu">
-            <span class="user-avatar">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="8" r="4"></circle>
-                <path d="M20 21a8 8 0 0 0-16 0"></path>
-              </svg>
-            </span>
-            <span class="user-name">Usen</span>
-            <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </div>
+          <a routerLink="/" class="nav-link">Inicio</a>
+          <ng-container *ngIf="!isLoggedIn">
+            <a routerLink="/login" class="nav-link">Iniciar Sesión</a>
+            <a routerLink="/register" class="btn-nav-primary">Crear Cuenta</a>
+          </ng-container>
+          <ng-container *ngIf="isLoggedIn">
+            <a routerLink="/app/dashboard" class="btn-nav-primary">Ir al Panel</a>
+          </ng-container>
         </div>
       </header>
 
-      <!-- Stepper / Breadcrumbs -->
-      <nav class="steps-nav">
-        <span class="step-item">Crear Empresa</span>
-        <span class="step-separator">&gt;</span>
-        <span class="step-item active">Planes</span>
-        <span class="step-separator">&gt;</span>
-        <span class="step-item">Configuración</span>
-      </nav>
-
       <!-- Main Content -->
       <main class="main-content">
-        <h1 class="page-title">Selecciona el plan para tu nueva empresa</h1>
+        <h1 class="page-title">Planes para tu empresa</h1>
+        <p class="page-subtitle">Elige la modalidad que mejor se adapte al volumen operativo de tu negocio.</p>
 
         <!-- Billing Period Toggle -->
         <div class="toggle-container">
@@ -62,80 +46,61 @@ import { FormsModule } from '@angular/forms';
           </label>
           <span class="toggle-label" [class.active]="isAnnual" (click)="isAnnual = true">
             Anual
-            <span class="save-badge" *ngIf="isAnnual">-10% Ahorro</span>
+            <span class="save-badge" *ngIf="isAnnual">Ahorro Anual</span>
           </span>
         </div>
 
         <!-- Plans Cards Grid -->
         <div class="plans-grid">
-          <!-- Card: Plan Base -->
-          <div class="plan-card base-card">
-            <div class="card-header base-header">
-              <h3>Plan Base</h3>
+          <div
+            *ngFor="let plan of plans"
+            class="plan-card"
+            [class.advanced-card]="plan.esRecomendado"
+            [class.base-card]="!plan.esRecomendado"
+          >
+            <div class="card-header" [class.advanced-header]="plan.esRecomendado" [class.base-header]="!plan.esRecomendado">
+              <h3>{{ plan.nombre }}</h3>
+              <span *ngIf="plan.esRecomendado" class="recommended-tag">Recomendado</span>
             </div>
-            
+
             <div class="card-body">
+              <p class="plan-desc">{{ plan.descripcion }}</p>
+
               <ul class="features-list">
-                <li><span class="bullet">•</span> Gestión básica de inventario</li>
-                <li><span class="bullet">•</span> 1 Almacén</li>
-                <li><span class="bullet">•</span> Próximamente</li>
-                <li><span class="bullet">•</span> etc.</li>
+                <li *ngFor="let feature of plan.caracteristicas">
+                  <span class="bullet">✓</span> {{ feature }}
+                </li>
               </ul>
 
-              <button class="btn-select btn-base" (click)="selectPlan('base')">
-                Elegir
+              <button
+                class="btn-select"
+                [class.btn-advanced]="plan.esRecomendado"
+                [class.btn-base]="!plan.esRecomendado"
+                (click)="selectPlan(plan)"
+              >
+                Comenzar con {{ plan.nombre }}
               </button>
 
               <div class="pricing-info">
                 <div class="main-price">
-                  <span class="amount">\${{ isAnnual ? '9' : '10' }}</span>
-                  <span class="period">/ mensual</span>
+                  <span class="amount">\${{ isAnnual ? (plan.precioAnual / 12 | number:'1.2-2') : (plan.precioMensual | number:'1.2-2') }}</span>
+                  <span class="period">/ mes</span>
                 </div>
                 <div class="sub-price">
-                  \${{ isAnnual ? '108' : '120' }} / anual
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card: Plan Avanzado / Superior -->
-          <div class="plan-card advanced-card">
-            <div class="card-header advanced-header">
-              <h3>Plan Avanzado</h3>
-            </div>
-            
-            <div class="card-body">
-              <ul class="features-list">
-                <li><span class="bullet">•</span> Gestión básica de inventario</li>
-                <li><span class="bullet">•</span> 1 Almacén</li>
-                <li><span class="bullet">•</span> Próximamente</li>
-                <li><span class="bullet">•</span> etc.</li>
-              </ul>
-
-              <button class="btn-select btn-advanced" (click)="selectPlan('avanzado')">
-                Elegir
-              </button>
-
-              <div class="pricing-info">
-                <div class="main-price">
-                  <span class="amount">\${{ isAnnual ? '45' : '50' }}</span>
-                  <span class="period">/ mensual</span>
-                </div>
-                <div class="sub-price">
-                  \${{ isAnnual ? '540' : '600' }} / anual
+                  Facturación {{ isAnnual ? ('anual de $' + (plan.precioAnual | number:'1.2-2')) : ('mensual de $' + (plan.precioMensual | number:'1.2-2')) }}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Trust Badges / Guarantees -->
+        <!-- Guarantees -->
         <div class="guarantees-bar">
           <div class="guarantee-item">
             <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            <span>Sin tarjeta requerida</span>
+            <span>Configuración inmediata</span>
           </div>
           <div class="guarantee-item">
             <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -147,19 +112,25 @@ import { FormsModule } from '@angular/forms';
             <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            <span>Integración nativa AI</span>
+            <span>Soporte técnico incluido</span>
           </div>
         </div>
       </main>
     </div>
   `,
   styles: [`
-    /* Top Navigation */
+    :host {
+      display: block;
+      min-height: 100vh;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
     .top-nav {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.85rem 2.5rem;
+      padding: 1rem 2.5rem;
       background: #ffffff;
       border-bottom: 1px solid #e2e8f0;
     }
@@ -168,25 +139,6 @@ import { FormsModule } from '@angular/forms';
       display: flex;
       align-items: center;
       gap: 1rem;
-    }
-
-    .menu-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      color: #475569;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .menu-btn:hover {
-      background: #e2e8f0;
-      color: #0f172a;
     }
 
     .brand {
@@ -212,89 +164,63 @@ import { FormsModule } from '@angular/forms';
     .nav-right {
       display: flex;
       align-items: center;
+      gap: 1.25rem;
     }
 
-    .user-menu {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 20px;
-      cursor: pointer;
+    .nav-link {
+      text-decoration: none;
       color: #475569;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: #1d4ed8;
+    }
+
+    .btn-nav-primary {
+      text-decoration: none;
+      background: #1d4ed8;
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
       transition: background 0.2s;
     }
 
-    .user-menu:hover {
-      background: #f1f5f9;
+    .btn-nav-primary:hover {
+      background: #1e40af;
     }
 
-    .user-avatar {
-      display: flex;
-      align-items: center;
-      color: #64748b;
-    }
-
-    .user-name {
-      font-size: 0.88rem;
-      font-weight: 500;
-      color: #334155;
-    }
-
-    .chevron-icon {
-      color: #94a3b8;
-    }
-
-    /* Steps Breadcrumbs */
-    .steps-nav {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      padding: 1.75rem 1rem 0.5rem;
-      font-size: 0.84rem;
-      color: #64748b;
-    }
-
-    .step-item {
-      font-weight: 500;
-    }
-
-    .step-item.active {
-      font-weight: 700;
-      color: #0f172a;
-      text-decoration: underline;
-      text-underline-offset: 4px;
-      text-decoration-thickness: 2px;
-    }
-
-    .step-separator {
-      color: #cbd5e1;
-      font-size: 0.75rem;
-    }
-
-    /* Main Container */
     .main-content {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 1rem 1.5rem 4rem;
+      padding: 2.5rem 1.5rem 4rem;
       max-width: 1000px;
       margin: 0 auto;
       width: 100%;
     }
 
     .page-title {
-      font-size: 1.75rem;
+      font-size: 1.85rem;
       font-weight: 800;
       color: #0f172a;
       letter-spacing: -0.03em;
-      margin: 1rem 0 1.5rem;
+      margin: 0 0 0.5rem;
       text-align: center;
     }
 
-    /* Toggle Switch */
+    .page-subtitle {
+      font-size: 0.95rem;
+      color: #64748b;
+      margin: 0 0 2rem;
+      text-align: center;
+    }
+
     .toggle-container {
       display: flex;
       align-items: center;
@@ -373,10 +299,9 @@ import { FormsModule } from '@angular/forms';
       transform: translateX(22px);
     }
 
-    /* Plans Grid */
     .plans-grid {
       display: grid;
-      grid-template-columns: repeat(2, 280px);
+      grid-template-columns: repeat(auto-fit, minmax(300px, 340px));
       gap: 2rem;
       justify-content: center;
       width: 100%;
@@ -408,8 +333,10 @@ import { FormsModule } from '@angular/forms';
     }
 
     .card-header {
-      padding: 0.85rem 1rem;
-      text-align: center;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .card-header h3 {
@@ -419,12 +346,22 @@ import { FormsModule } from '@angular/forms';
       color: #0f172a;
     }
 
+    .recommended-tag {
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: #0f766e;
+      color: #ffffff;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
     .base-header {
-      background-color: #cbd5e1;
+      background-color: #e2e8f0;
     }
 
     .advanced-header {
-      background-color: #bbf7d0;
       background: #b6ebe4;
     }
 
@@ -433,6 +370,13 @@ import { FormsModule } from '@angular/forms';
       display: flex;
       flex-direction: column;
       flex: 1;
+    }
+
+    .plan-desc {
+      font-size: 0.84rem;
+      color: #64748b;
+      margin: 0 0 1.25rem;
+      line-height: 1.45;
     }
 
     .features-list {
@@ -453,14 +397,14 @@ import { FormsModule } from '@angular/forms';
     }
 
     .bullet {
-      color: #334155;
-      font-size: 1.1rem;
-      line-height: 0;
+      color: #0d9488;
+      font-weight: 800;
+      font-size: 0.9rem;
     }
 
     .btn-select {
       width: 100%;
-      padding: 0.65rem 1rem;
+      padding: 0.7rem 1rem;
       border-radius: 8px;
       font-size: 0.9rem;
       font-weight: 600;
@@ -524,7 +468,6 @@ import { FormsModule } from '@angular/forms';
       font-weight: 500;
     }
 
-    /* Guarantees Bar */
     .guarantees-bar {
       display: flex;
       align-items: center;
@@ -554,7 +497,7 @@ import { FormsModule } from '@angular/forms';
 
       .plans-grid {
         grid-template-columns: 1fr;
-        max-width: 320px;
+        max-width: 340px;
       }
 
       .guarantees-bar {
@@ -564,10 +507,66 @@ import { FormsModule } from '@angular/forms';
     }
   `]
 })
-export class PlansComponent {
-  isAnnual = false;
+export class PlansComponent implements OnInit {
+  private readonly apiService = inject(ApiService);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
-  selectPlan(plan: 'base' | 'avanzado'): void {
-    console.log(`Plan seleccionado: ${plan}, modalidad: ${this.isAnnual ? 'Anual' : 'Mensual'}`);
+  isAnnual = false;
+  isLoggedIn = false;
+
+  plans: PlanDto[] = [
+    {
+      id: 1,
+      nombre: 'Plan Base',
+      descripcion: 'Ideal para pequeños negocios que inician su gestión de inventario.',
+      precioMensual: 29.99,
+      precioAnual: 299.99,
+      caracteristicas: [
+        'Gestión de hasta 500 productos',
+        '1 bodega o almacén principal',
+        'Alertas básicas de stock mínimo',
+        'Soporte estándar por correo'
+      ],
+      esRecomendado: false
+    },
+    {
+      id: 2,
+      nombre: 'Plan Avanzado',
+      descripcion: 'Para empresas en expansión con múltiples sedes y mayor volumen.',
+      precioMensual: 59.99,
+      precioAnual: 599.99,
+      caracteristicas: [
+        'Productos y categorías ilimitadas',
+        'Múltiples bodegas y transferencias internas',
+        'Alertas automáticas y reportes avanzados',
+        'Soporte prioritario 24/7'
+      ],
+      esRecomendado: true
+    }
+  ];
+
+  ngOnInit(): void {
+    this.isLoggedIn = this.authService.isAuthenticated();
+    this.apiService.getPlans().subscribe({
+      next: (data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          this.plans = data;
+          this.cdr.detectChanges();
+        }
+      },
+      error: () => {
+        // Fallback plans already loaded
+      }
+    });
+  }
+
+  selectPlan(_plan: PlanDto): void {
+    if (this.isLoggedIn) {
+      this.router.navigate(['/app/dashboard']);
+    } else {
+      this.router.navigate(['/register']);
+    }
   }
 }

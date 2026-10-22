@@ -83,6 +83,7 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddSingleton<IProductService, ProductService>();
+builder.Services.AddScoped<IProductBulkImportService, ProductBulkImportService>();
 
 // Configuración de autenticación JWT (Esquema por defecto para API REST Angular)
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -116,7 +117,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins("http://localhost:4200", "http://localhost:3000", "http://localhost:5173")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -170,6 +171,8 @@ app.UseAuthorization();
 // MIDDLEWARE DE CONTROL DE ACCESO POR ROL (después de Authorization)
 // =========================================================================
 app.UseMiddleware<RoleAccessControlMiddleware>();
+// Protección de la importación masiva de inventario (tipo de contenido y tamaño máximo del lote)
+app.UseMiddleware<BulkImportGuardMiddleware>();
 
 // Mapeo de Controladores de API (Rutas con [Route("api/...")] y [ApiController])
 app.MapControllers();

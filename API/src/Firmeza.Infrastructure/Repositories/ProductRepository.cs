@@ -31,6 +31,7 @@ public class ProductRepository(ApplicationDbContext context) : IProductRepositor
     {
         return await context.Products
             .AsNoTracking()
+            .Include(p => p.Enterprise)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
     }
@@ -60,5 +61,39 @@ public class ProductRepository(ApplicationDbContext context) : IProductRepositor
     {
         context.Products.Remove(product);
         await context.SaveChangesAsync(ct);
+    }
+
+    public async Task<List<Product>> GetBySkusAsync(IEnumerable<string> normalizedSkus, int? enterpriseId, CancellationToken ct = default)
+    {
+        var skus = normalizedSkus.Distinct().ToList();
+        if (skus.Count == 0)
+        {
+            return [];
+        }
+
+        // Sin AsNoTracking: las entidades devueltas se modifican y se guardan en BulkUpsertAsync.
+        // El filtro por EnterpriseId garantiza el aislamiento entre empresas.
+        return await context.Products
+            .Where(p => p.EnterpriseId == enterpriseId && skus.Contains(p.Sku.ToUpper()))
+            .ToListAsync(ct);
+    }
+
+    public async Task BulkUpsertAsync(IEnumerable<Product> toInsert, IEnumerable<Product> toUpdate, CancellationToken ct = default)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+
+        await context.Products.AddRangeAsync(toInsert, ct);
+
+        foreach (var product in toUpdate)
+        {
+            // Si la entidad ya viene rastreada (GetBySkusAsync), EF detecta los cambios por sí solo.
+            if (context.Entry(product).State == EntityState.Detached)
+            {
+                context.Products.Update(product);
+            }
+        }
+
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 }

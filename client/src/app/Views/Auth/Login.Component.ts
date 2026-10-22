@@ -1,18 +1,18 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../Services/Api.Service';
 import { AuthService, UserSession } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="login-wrapper">
       <header class="top-navbar">
-        <a href="/" class="brand">
+        <a routerLink="/" class="brand">
           <span class="brand-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -26,8 +26,9 @@ import { AuthService, UserSession } from '../../Services/auth.service';
           </div>
         </a>
         <div class="nav-links">
-          <a href="/">Inicio</a>
-          <a href="/register">Crear Cuenta</a>
+          <a routerLink="/">Inicio</a>
+          <a routerLink="/plans">Planes</a>
+          <a routerLink="/register">Crear Cuenta</a>
         </div>
       </header>
 
@@ -43,7 +44,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
             <div class="left-content">
               <span class="section-tag">GESTIÓN OPERATIVA</span>
               <h1>Control de existencias y operaciones en tiempo real</h1>
-              <p>Monitoreo continuo de stock, movimientos de almacén y trazabilidad precisa en cada estación de trabajo.</p>
+              <p>Monitoreo continuo de stock, movimientos de almacén y trazabilidad precisa para tu empresa.</p>
               
               <div class="sync-card">
                 <div class="sync-icon">
@@ -54,35 +55,35 @@ import { AuthService, UserSession } from '../../Services/auth.service';
                 <div class="sync-details">
                   <div class="sync-title">
                     <span>Seguridad y Protección</span>
-                    <strong class="sync-percent">TLS 1.3</strong>
+                    <strong class="sync-percent">JWT Auth</strong>
                   </div>
-                  <span class="sync-sub">Canal de comunicación seguro</span>
+                  <span class="sync-sub">Acceso diferenciado para empresas y empleados</span>
                 </div>
               </div>
 
               <div class="stats-grid">
                 <div class="stat-box">
-                  <span class="stat-label">DISPONIBILIDAD</span>
-                  <div class="stat-value">99.9%</div>
-                  <span class="stat-trend">Servicio activo</span>
+                  <span class="stat-label">INVENTARIO</span>
+                  <div class="stat-value">En Vivo</div>
+                  <span class="stat-trend">Stock y alertas</span>
                 </div>
                 <div class="stat-box">
-                  <span class="stat-label">RESPUESTA</span>
-                  <div class="stat-value-text">Inmediata</div>
-                  <span class="stat-subtext">Sincronización continua</span>
+                  <span class="stat-label">MOVIMIENTOS</span>
+                  <div class="stat-value-text">Pedidos y Ventas</div>
+                  <span class="stat-subtext">Sincronización directa</span>
                 </div>
               </div>
             </div>
 
             <div class="left-footer">
-              Acceso seguro para personal y operadores autorizados.
+              Acceso seguro para empresas registradas y personal autorizado.
             </div>
           </div>
 
           <!-- Right Form Panel -->
           <div class="right-panel">
             <div class="right-header">
-              <span class="console-tag">ACCESO A TERMINAL</span>
+              <span class="console-tag">ACCESO AL SISTEMA</span>
               <span class="tls-badge">Conexión Segura</span>
             </div>
             
@@ -181,7 +182,6 @@ import { AuthService, UserSession } from '../../Services/auth.service';
                 <div class="form-group">
                   <div class="label-row">
                     <label>Contraseña</label>
-                    <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
                   </div>
                   <div class="input-wrapper">
                     <span class="input-icon">
@@ -212,11 +212,6 @@ import { AuthService, UserSession } from '../../Services/auth.service';
                 </div>
               </ng-container>
 
-              <div class="checkbox-group">
-                <input type="checkbox" id="keep-session" [(ngModel)]="rememberSession" name="rememberSession" />
-                <label for="keep-session">Recordar esta sesión</label>
-              </div>
-
               <div *ngIf="loginMessage" class="feedback-msg success-box">
                 <strong>Éxito:</strong> {{ loginMessage }}
               </div>
@@ -232,7 +227,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
 
               <div *ngIf="!isEmployee" class="register-link">
                 <span>¿No tienes una cuenta aún?</span>
-                <a href="/register">Registrar organización</a>
+                <a routerLink="/register">Registrar organización</a>
               </div>
 
               <div *ngIf="isEmployee" class="register-link employee-portal-note">
@@ -253,9 +248,9 @@ import { AuthService, UserSession } from '../../Services/auth.service';
           <span>© 2026 Firmeza Technologies. Todos los derechos reservados.</span>
         </div>
         <div class="footer-right">
-          <a href="#">Privacidad</a>
-          <a href="#">Términos</a>
-          <a href="#">Soporte</a>
+          <a routerLink="/">Inicio</a>
+          <a routerLink="/plans">Planes</a>
+          <a routerLink="/register">Crear Cuenta</a>
         </div>
       </footer>
     </div>
@@ -580,16 +575,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
       color: #334155; 
     }
 
-    .forgot-link { 
-      font-size: 0.78rem; 
-      color: #1d4ed8; 
-      text-decoration: none; 
-      font-weight: 600; 
-      transition: color 0.2s ease;
-    }
-    .forgot-link:hover { text-decoration: underline; }
-
-    .input-wrapper, .input-select-wrapper { 
+    .input-wrapper { 
       display: flex; 
       align-items: center; 
       background: #f8fafc; 
@@ -601,7 +587,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
     }
 
-    .input-wrapper:focus-within, .input-select-wrapper:focus-within {
+    .input-wrapper:focus-within {
       border-color: #2563eb;
       background: #ffffff;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
@@ -613,7 +599,7 @@ import { AuthService, UserSession } from '../../Services/auth.service';
       color: #64748b; 
     }
 
-    input:not([type="checkbox"]):not([type="radio"]), select { 
+    input:not([type="checkbox"]):not([type="radio"]) { 
       border: none; 
       background: transparent; 
       outline: none; 
@@ -717,29 +703,6 @@ import { AuthService, UserSession } from '../../Services/auth.service';
       line-height: 1.45;
     }
 
-    .checkbox-group { 
-      display: flex; 
-      align-items: center; 
-      gap: 0.6rem; 
-    }
-
-    .checkbox-group input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      cursor: pointer;
-      accent-color: #1d4ed8;
-      flex-shrink: 0;
-      margin: 0;
-    }
-
-    .checkbox-group label { 
-      font-size: 0.8rem; 
-      color: #64748b; 
-      font-weight: 500; 
-      cursor: pointer;
-      margin: 0;
-    }
-
     .feedback-msg {
       padding: 0.85rem 1.1rem;
       border-radius: 8px;
@@ -839,7 +802,6 @@ export class LoginComponent implements OnInit {
   password = '';
   showPassword = false;
   documentNumber = '';
-  rememberSession = false;
   isLoading = false;
   loginMessage: string | null = null;
   loginError: string | null = null;
@@ -858,7 +820,6 @@ export class LoginComponent implements OnInit {
   onDocumentInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input) {
-      // Filtrar estrictamente caracteres no numéricos
       const numericOnly = input.value.replace(/\D/g, '');
       this.documentNumber = numericOnly;
       input.value = numericOnly;
@@ -915,7 +876,6 @@ export class LoginComponent implements OnInit {
         const role = response?.role || response?.Role || (this.isEmployee ? 'Employee' : 'Enterprise');
         const accountType = response?.accountType || response?.AccountType || (this.isEmployee ? 'empleado' : 'empresa');
 
-        // VALIDACIÓN: Rechazar acceso si es cuenta de Cliente
         const roleLower = String(role || '').toLowerCase();
         const accountTypeLower = String(accountType || '').toLowerCase();
         if (roleLower === 'client' || roleLower === 'cliente' || accountTypeLower === 'persona' || accountTypeLower === 'cliente') {
@@ -931,7 +891,6 @@ export class LoginComponent implements OnInit {
           role === 'Employee' ||
           role === 'Empleado';
 
-        // Limpiar completamente cualquier residuo de sesión anterior
         localStorage.removeItem('firmeza_token');
         localStorage.removeItem('token');
         localStorage.removeItem('firmeza_user');

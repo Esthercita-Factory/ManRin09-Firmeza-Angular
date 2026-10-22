@@ -12,4 +12,15 @@ public interface IProductRepository
     Task AddAsync(Product product, CancellationToken ct = default);
     Task UpdateAsync(Product product, CancellationToken ct = default);
     Task DeleteAsync(Product product, CancellationToken ct = default);
+
+    /// <summary>
+    /// Obtiene (con seguimiento de cambios) los productos de una empresa cuyos SKU coinciden
+    /// con la lista indicada. La comparación es insensible a mayúsculas.
+    /// </summary>
+    Task<List<Product>> GetBySkusAsync(IEnumerable<string> normalizedSkus, int? enterpriseId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Inserta los productos nuevos y persiste los existentes modificados en una única transacción.
+    /// </summary>
+    Task BulkUpsertAsync(IEnumerable<Product> toInsert, IEnumerable<Product> toUpdate, CancellationToken ct = default);
 }
