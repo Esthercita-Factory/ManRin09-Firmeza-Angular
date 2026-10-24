@@ -21,7 +21,7 @@ public class SaleService(
     {
         var clientName = s.Client is not null
             ? $"{s.Client.FirstName} {s.Client.LastName}".Trim()
-            : $"Cliente #{s.ClientId}";
+            : (s.ClientId.HasValue ? $"Cliente #{s.ClientId.Value}" : "Consumidor Final");
 
         var details = (s.Details ?? []).Select(d => new SaleDetailResponseDto(
             d.Id,
@@ -73,11 +73,15 @@ public class SaleService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        // 1. Validar existencia del cliente
-        var client = await clientRepository.GetByIdAsync(request.ClientId);
-        if (client is null)
+        // 1. Validar existencia del cliente si se proporcionó un ID válido (AC-CLI-02 Consumidor Final)
+        Client? client = null;
+        if (request.ClientId.HasValue && request.ClientId.Value > 0)
         {
-            throw new InvalidOperationException($"El cliente con ID {request.ClientId} no existe en el sistema.");
+            client = await clientRepository.GetByIdAsync(request.ClientId.Value);
+            if (client is null)
+            {
+                throw new InvalidOperationException($"El cliente con ID {request.ClientId.Value} no existe en el sistema.");
+            }
         }
 
         // 2. Validar que la orden contenga al menos un renglón
@@ -166,7 +170,7 @@ public class SaleService(
 
             var sale = new Sale
             {
-                ClientId = request.ClientId,
+                ClientId = client?.Id,
                 Client = client,
                 Quantity = totalQuantity,
                 TotalAmount = totalAmount,

@@ -35,7 +35,7 @@ export interface CreateSaleItemDto {
 }
 
 export interface CreateSaleDto {
-  clientId: number;
+  clientId?: number;
   items: CreateSaleItemDto[];
   paymentMethod: string;
   isPaid: boolean;

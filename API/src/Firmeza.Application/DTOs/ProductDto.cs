@@ -51,6 +51,7 @@ public record ProductResponseDto(
     string Description,
     string Category,
     string CategoryDetail,
+    string UnitOfMeasure,
     string Location,
     decimal CostPrice,
     decimal Price,
@@ -89,15 +90,20 @@ public record ProductDto(
     string LastMovement,
     int MinStock,
     Guid? RegisteredById,
-    int? EnterpriseId
+    int? EnterpriseId,
+    string UnitOfMeasure = "Unidad"
 );
 
 /// <summary>
 /// DTO para el registro de un nuevo producto en inventario.
 /// Basado en el estándar de CreateEmployeeRequestDto con límites ajustados.
 /// Omite datos autogenerados (Id, Timestamps) y RegisteredById (obtenido desde las claims JWT).
+/// <summary>
+/// DTO para el registro de un nuevo producto en inventario.
+/// Basado en el estándar de CreateEmployeeRequestDto con límites ajustados.
+/// Omite datos autogenerados (Id, Timestamps) y RegisteredById (obtenido desde las claims JWT).
 /// </summary>
-public record CreateProductRequestDto
+public record CreateProductRequestDto : IValidatableObject
 {
     [Required(ErrorMessage = "El código SKU es obligatorio.")]
     [MaxLength(30, ErrorMessage = "El código SKU no puede superar 30 caracteres.")]
@@ -119,6 +125,9 @@ public record CreateProductRequestDto
 
     [MaxLength(50, ErrorMessage = "El detalle de categoría no puede superar 50 caracteres.")]
     public string? CategoryDetail { get; init; }
+
+    [MaxLength(30, ErrorMessage = "La unidad de medida no puede superar 30 caracteres.")]
+    public string UnitOfMeasure { get; init; } = "Unidad";
 
     [Required(ErrorMessage = "La ubicación en almacén es obligatoria.")]
     [MaxLength(30, ErrorMessage = "La ubicación no puede superar 30 caracteres.")]
@@ -163,13 +172,30 @@ public record CreateProductRequestDto
     public int MinStock { get; init; } = 5;
 
     public int? EnterpriseId { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Price <= 0)
+        {
+            yield return new ValidationResult(
+                "El precio de venta debe ser mayor a cero.",
+                [nameof(Price)]);
+        }
+
+        if (Price < CostPrice)
+        {
+            yield return new ValidationResult(
+                $"El precio de venta (${Price:F2}) no puede ser menor al precio de costo (${CostPrice:F2}) sin autorización explícita.",
+                [nameof(Price)]);
+        }
+    }
 }
 
 /// <summary>
 /// DTO para la actualización de un producto existente.
 /// Basado en el estándar de UpdateEmployeeRequestDto con límites ajustados.
 /// </summary>
-public record UpdateProductRequestDto
+public record UpdateProductRequestDto : IValidatableObject
 {
     [MaxLength(30, ErrorMessage = "El código SKU no puede superar 30 caracteres.")]
     public string? Sku { get; init; }
@@ -190,6 +216,9 @@ public record UpdateProductRequestDto
 
     [MaxLength(50, ErrorMessage = "El detalle de categoría no puede superar 50 caracteres.")]
     public string? CategoryDetail { get; init; }
+
+    [MaxLength(30, ErrorMessage = "La unidad de medida no puede superar 30 caracteres.")]
+    public string UnitOfMeasure { get; init; } = "Unidad";
 
     [Required(ErrorMessage = "La ubicación en almacén es obligatoria.")]
     [MaxLength(30, ErrorMessage = "La ubicación no puede superar 30 caracteres.")]
@@ -234,4 +263,69 @@ public record UpdateProductRequestDto
     public int MinStock { get; init; } = 5;
 
     public bool IsActive { get; init; } = true;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Price <= 0)
+        {
+            yield return new ValidationResult(
+                "El precio de venta debe ser mayor a cero.",
+                [nameof(Price)]);
+        }
+
+        if (Price < CostPrice)
+        {
+            yield return new ValidationResult(
+                $"El precio de venta (${Price:F2}) no puede ser menor al precio de costo (${CostPrice:F2}) sin autorización explícita.",
+                [nameof(Price)]);
+        }
+    }
+}
+
+/// <summary>
+/// Parámetros de consulta para paginación y filtrado en servidor del catálogo de productos.
+/// Soporta búsqueda por texto (nombre, SKU, código de barras), categoría, rango de precios y disponibilidad.
+/// </summary>
+public record ProductFilterDto
+{
+    public string? Search { get; init; }
+    public string? Category { get; init; }
+    public decimal? MinPrice { get; init; }
+    public decimal? MaxPrice { get; init; }
+    public bool? InStockOnly { get; init; }
+    public int? EnterpriseId { get; init; }
+
+    private readonly int _page = 1;
+    public int Page
+    {
+        get => _page;
+        init => _page = value < 1 ? 1 : value;
+    }
+
+    private readonly int _pageSize = 20;
+    public int PageSize
+    {
+        get => _pageSize;
+        init => _pageSize = value switch
+        {
+            < 1 => 1,
+            > 100 => 100,
+            _ => value
+        };
+    }
+}
+
+/// <summary>
+/// Contenedor genérico para resultados paginados en el servidor.
+/// </summary>
+/// <typeparam name="T">Tipo del elemento paginado.</typeparam>
+public record PagedResultDto<T>(
+    IReadOnlyCollection<T> Items,
+    int TotalCount,
+    int Page,
+    int PageSize)
+{
+    public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
+    public bool HasPrevious => Page > 1;
+    public bool HasNext => Page < TotalPages;
 }

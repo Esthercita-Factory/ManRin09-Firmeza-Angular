@@ -30,6 +30,10 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.Role)
             .HasMaxLength(100);
 
+        builder.Property(e => e.PasswordHash)
+            .HasColumnType("text")
+            .IsRequired(false);
+
         builder.Property(e => e.IsActive)
             .IsRequired();
 

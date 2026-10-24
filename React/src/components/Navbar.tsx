@@ -1,9 +1,9 @@
-import { Search, ShoppingCart, User as UserIcon, LogOut, Store } from 'lucide-react';
+import { Search, ShoppingCart, User as UserIcon, LogOut, Store, Package } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 interface NavbarProps {
   currentPage: string;
-  onNavigate: (page: 'catalog' | 'cart' | 'stores' | 'login') => void;
+  onNavigate: (page: 'catalog' | 'cart' | 'stores' | 'login' | 'orders') => void;
   search: string;
   onSearchChange: (value: string) => void;
 }
@@ -68,6 +68,16 @@ export function Navbar({ currentPage, onNavigate, search, onSearchChange }: Navb
 
             {user ? (
               <div className="flex items-center gap-3 pl-2 border-l border-slate-800">
+                <button
+                  onClick={() => onNavigate('orders')}
+                  className={`text-xs font-semibold px-3 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                    currentPage === 'orders' ? 'text-amber-400 bg-slate-900' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Mis Pedidos</span>
+                </button>
+
                 <div className="text-right hidden lg:block">
                   <span className="text-xs font-bold text-slate-200 block leading-tight">
                     {user.fullName}

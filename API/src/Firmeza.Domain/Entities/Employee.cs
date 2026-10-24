@@ -28,6 +28,11 @@ public class Employee
     public string Role { get; set; } = string.Empty;
 
     /// <summary>
+    /// Hash seguro de la contraseña del colaborador (BCrypt / PBKDF2).
+    /// </summary>
+    public string PasswordHash { get; set; } = string.Empty;
+
+    /// <summary>
     /// Estado del empleado en el sistema (activo o inactivo).
     /// </summary>
     public bool IsActive { get; set; } = true;

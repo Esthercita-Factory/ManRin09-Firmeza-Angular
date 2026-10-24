@@ -10,7 +10,6 @@ namespace Firmeza.Infrastructure.Services;
 
 /// <summary>
 /// Implementación del servicio de gestión de clientes interactuando con EF Core e Identity.
-/// Utiliza constructores primarios de C# 14.
 /// </summary>
 public class ClientService(
     ApplicationDbContext context,
@@ -20,12 +19,13 @@ public class ClientService(
     {
         return await context.Clients
             .AsNoTracking()
-            .Include(c => c.User) // Cargar la cuenta de Identity relacionada
+            .Include(c => c.User)
             .Select(c => new ClientResponseDto(
                 c.Id,
+                c.DocumentNumber,
                 c.FirstName,
                 c.LastName,
-                c.User != null ? c.User.Email ?? c.Email : c.Email, // Mapear el correo desde Identity
+                c.User != null ? c.User.Email ?? c.Email : c.Email,
                 c.Phone,
                 c.IsActive,
                 c.CreatedAt,
@@ -38,13 +38,14 @@ public class ClientService(
     {
         return await context.Clients
             .AsNoTracking()
-            .Include(c => c.User) // Cargar la cuenta de Identity relacionada
+            .Include(c => c.User)
             .Where(c => c.Id == id)
             .Select(c => new ClientResponseDto(
                 c.Id,
+                c.DocumentNumber,
                 c.FirstName,
                 c.LastName,
-                c.User != null ? c.User.Email ?? c.Email : c.Email, // Mapear el correo desde Identity
+                c.User != null ? c.User.Email ?? c.Email : c.Email,
                 c.Phone,
                 c.IsActive,
                 c.CreatedAt,
@@ -64,7 +65,21 @@ public class ClientService(
             throw new InvalidOperationException($"Ya existe una cuenta registrada con el correo electrónico '{dto.Email}'.");
         }
 
-        // 2. Crear el ApplicationUser (Identidad)
+        // 2. Verificar unicidad de documento si fue provisto
+        if (!string.IsNullOrWhiteSpace(dto.DocumentNumber))
+        {
+            var cleanDoc = dto.DocumentNumber.Trim();
+            var docExists = await context.Clients.AnyAsync(
+                c => c.EnterpriseId == dto.EnterpriseId && c.DocumentNumber == cleanDoc, 
+                cancellationToken);
+
+            if (docExists)
+            {
+                throw new InvalidOperationException($"Ya existe un cliente con el documento '{cleanDoc}' registrado en la empresa.");
+            }
+        }
+
+        // 3. Crear el ApplicationUser (Identidad)
         var user = new ApplicationUser
         {
             UserName = dto.Email,
@@ -80,19 +95,19 @@ public class ClientService(
             throw new InvalidOperationException($"Error al crear la cuenta de usuario: {errors}");
         }
 
-        // Asignar rol (consistente con el AuthService)
         await userManager.AddToRoleAsync(user, "Client");
 
-        // 3. Crear el Client (Datos de negocio) vinculado por UserId
+        // 4. Crear el Client (Datos de negocio) vinculado por UserId
         var client = new Client
         {
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
-            Phone = dto.Phone,
+            DocumentNumber = dto.DocumentNumber?.Trim() ?? string.Empty,
+            FirstName = dto.FirstName.Trim(),
+            LastName = dto.LastName.Trim(),
+            Phone = dto.Phone.Trim(),
             CreatedAt = DateTime.UtcNow,
             IsActive = true,
             EnterpriseId = dto.EnterpriseId,
-            UserId = user.Id // Relación 1 a 1
+            UserId = user.Id
         };
 
         await context.Clients.AddAsync(client, cancellationToken);
@@ -100,6 +115,7 @@ public class ClientService(
 
         return new ClientResponseDto(
             client.Id,
+            client.DocumentNumber,
             client.FirstName,
             client.LastName,
             user.Email!,
@@ -114,7 +130,6 @@ public class ClientService(
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        // Se incluye User en caso de que queramos manipular su estado en Identity
         var client = await context.Clients
             .Include(c => c.User)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
@@ -124,17 +139,29 @@ public class ClientService(
             return false;
         }
 
-        // Actualizar propiedades exclusivamente del negocio
-        client.FirstName = dto.FirstName;
-        client.LastName = dto.LastName;
-        client.Phone = dto.Phone;
+        if (!string.IsNullOrWhiteSpace(dto.DocumentNumber))
+        {
+            var cleanDoc = dto.DocumentNumber.Trim();
+            var docExists = await context.Clients.AnyAsync(
+                c => c.Id != id && c.EnterpriseId == client.EnterpriseId && c.DocumentNumber == cleanDoc,
+                cancellationToken);
+
+            if (docExists)
+            {
+                throw new InvalidOperationException($"Ya existe un cliente con el documento '{cleanDoc}' registrado en la empresa.");
+            }
+
+            client.DocumentNumber = cleanDoc;
+        }
+
+        client.FirstName = dto.FirstName.Trim();
+        client.LastName = dto.LastName.Trim();
+        client.Phone = dto.Phone.Trim();
         
-        // Manejar el borrado/desactivación lógico
         if (client.IsActive != dto.IsActive)
         {
             client.IsActive = dto.IsActive;
             
-            // Reflejar la desactivación bloqueando temporalmente la cuenta en Identity
             if (client.User is not null)
             {
                 if (!client.IsActive)
@@ -147,11 +174,6 @@ public class ClientService(
                 }
             }
         }
-
-        // Nota: Si el flujo y el DTO permitieran actualizar el Email o la Contraseña, 
-        // aquí se delegaría a Identity usando:
-        // await userManager.SetEmailAsync(client.User, dto.NuevoEmail);
-        // await userManager.SetUserNameAsync(client.User, dto.NuevoEmail);
 
         await context.SaveChangesAsync(cancellationToken);
         return true;
@@ -168,11 +190,8 @@ public class ClientService(
             return false;
         }
 
-        // Borrado lógico para preservar integridad histórica en tablas de negocio.
-        // Si quisieras un borrado físico, usarías: context.Clients.Remove(client); await userManager.DeleteAsync(client.User);
         client.IsActive = false;
         
-        // Bloquear permanentemente la cuenta en Identity para impedir login futuro
         if (client.User is not null)
         {
             await userManager.SetLockoutEndDateAsync(client.User, DateTimeOffset.MaxValue);

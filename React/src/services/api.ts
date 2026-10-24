@@ -68,5 +68,53 @@ export const api = {
     } catch (err: any) {
       return { success: false, message: 'Error de conexión con el servidor' };
     }
+  },
+
+  async checkout(
+    items: { productId: string; quantity: number; unitPrice?: number }[],
+    token: string,
+    paymentMethod: string = 'Efectivo / Tarjeta'
+  ): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/sale`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: items.map(i => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice
+          })),
+          paymentMethod,
+          isPaid: true
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.message || data.detail || 'No se pudo procesar la orden de compra.' };
+      }
+      return { success: true, data };
+    } catch (err: any) {
+      return { success: false, message: 'Error de conexión al procesar la orden.' };
+    }
+  },
+
+  async getMyPurchases(token: string): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE}/sale/my-purchases`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
   }
 };

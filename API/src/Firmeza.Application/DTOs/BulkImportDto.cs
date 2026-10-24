@@ -8,7 +8,7 @@ namespace Firmeza.Application.DTOs;
 /// Representa una fila de la plantilla oficial de inventario (Excel / CSV).
 /// Los límites de longitud coinciden con <see cref="CreateProductRequestDto"/> para mantener consistencia.
 /// </summary>
-public record BulkImportProductItemDto
+public record BulkImportProductItemDto : IValidatableObject
 {
     [Required(ErrorMessage = "El código SKU es obligatorio.")]
     [MaxLength(30, ErrorMessage = "El código SKU no puede superar 30 caracteres.")]
@@ -40,11 +40,31 @@ public record BulkImportProductItemDto
     [MaxLength(30, ErrorMessage = "La ubicación no puede superar 30 caracteres.")]
     public string? Location { get; init; }
 
+    [MaxLength(30, ErrorMessage = "La unidad de medida no puede superar 30 caracteres.")]
+    public string? UnitOfMeasure { get; init; }
+
     [Range(0, 100000, ErrorMessage = "El stock mínimo debe estar entre 0 y 100.000.")]
     public int? MinStock { get; init; }
 
     [MaxLength(30, ErrorMessage = "El código de barras no puede superar 30 caracteres.")]
     public string? Barcode { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (SalePrice <= 0)
+        {
+            yield return new ValidationResult(
+                $"El precio de venta del SKU '{Sku}' debe ser mayor a cero.",
+                [nameof(SalePrice)]);
+        }
+
+        if (SalePrice < CostPrice)
+        {
+            yield return new ValidationResult(
+                $"El precio de venta (${SalePrice:F2}) no puede ser menor al precio de costo (${CostPrice:F2}) para el SKU '{Sku}' sin autorización explícita.",
+                [nameof(SalePrice)]);
+        }
+    }
 }
 
 /// <summary>

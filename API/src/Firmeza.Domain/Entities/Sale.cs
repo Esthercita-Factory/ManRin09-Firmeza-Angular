@@ -15,7 +15,7 @@ public class Sale
     /// <summary>
     /// Identificador del cliente asociado a la venta.
     /// </summary>
-    public int ClientId { get; set; }
+    public int? ClientId { get; set; }
 
     /// <summary>
     /// Referencia de navegación al cliente asociado a la venta.

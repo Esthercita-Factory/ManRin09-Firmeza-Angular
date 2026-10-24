@@ -77,12 +77,16 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
         context.Response.Clear();
         context.Response.StatusCode = (int)statusCode;
-        context.Response.ContentType = "application/json";
+        context.Response.ContentType = "application/problem+json";
 
         var errorResponse = new
         {
+            Type = $"https://httpstatuses.com/{(int)statusCode}",
+            Title = statusCode.ToString(),
             Status = (int)statusCode,
-            Message = message,
+            Detail = message,
+            Instance = context.Request.Path.Value,
+            Message = message, // Compatibilidad con clientes Angular y React que leen error.error.message
             Path = context.Request.Path.Value,
             TraceId = context.TraceIdentifier,
             Timestamp = DateTime.UtcNow

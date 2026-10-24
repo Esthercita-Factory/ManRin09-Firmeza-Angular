@@ -13,13 +13,14 @@ namespace Firmeza.Api.Controllers;
 /// Controlador API RESTful para la gestión de empleados.
 /// Restringido exclusivamente a usuarios autenticados con rol "Enterprise" (Empresa).
 /// </summary>
-[Authorize(Roles = "Enterprise")]
+[Authorize(Roles = "Enterprise,Administrator")]
 [ApiController]
 [Route("api/[controller]")]
 public class EmployeesController(
     UserManager<ApplicationUser> userManager,
     IEnterpriseRepository enterpriseRepository,
-    IEmployeeRepository employeeRepository) : ControllerBase
+    IEmployeeRepository employeeRepository,
+    IPasswordHasher passwordHasher) : ControllerBase
 {
     /// <summary>
     /// Obtiene la lista de empleados pertenecientes a la empresa autenticada.
@@ -149,6 +150,7 @@ public class EmployeesController(
             FullName = request.FullName.Trim(),
             Phone = request.Phone?.Trim() ?? string.Empty,
             Role = string.IsNullOrWhiteSpace(request.Role) ? "Operador" : request.Role.Trim(),
+            PasswordHash = passwordHasher.Hash(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : cleanDocument),
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow,
             EnterpriseId = enterprise.Id
@@ -195,6 +197,10 @@ public class EmployeesController(
         if (!string.IsNullOrWhiteSpace(request.Role))
         {
             employee.Role = request.Role.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            employee.PasswordHash = passwordHasher.Hash(request.NewPassword);
         }
         employee.IsActive = request.IsActive;
 

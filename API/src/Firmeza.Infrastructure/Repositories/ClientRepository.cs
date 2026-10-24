@@ -26,6 +26,14 @@ public class ClientRepository(ApplicationDbContext context) : IClientRepository
             .FirstOrDefaultAsync(c => c.Email == email || (c.User != null && c.User.Email == email));
     }
 
+    public async Task<Client?> GetByUserIdAsync(string userId)
+    {
+        return await context.Clients
+            .Include(c => c.Enterprise)
+            .Include(c => c.User)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+    }
+
     public async Task<bool> ExistsByEmailAsync(string email)
     {
         return await context.Clients

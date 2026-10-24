@@ -12,6 +12,14 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         builder.HasKey(c => c.Id);
 
+        builder.Property(c => c.DocumentNumber)
+            .HasMaxLength(50)
+            .IsRequired(false);
+
+        // Documento único por empresa
+        builder.HasIndex(c => new { c.EnterpriseId, c.DocumentNumber })
+            .IsUnique();
+
         builder.Property(c => c.FirstName)
             .IsRequired()
             .HasMaxLength(200);
@@ -48,6 +56,7 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
             .HasForeignKey(c => c.EnterpriseId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
+
 
         // Relación 1:1 con Identity (ApplicationUser)
         builder.HasOne(c => c.User)

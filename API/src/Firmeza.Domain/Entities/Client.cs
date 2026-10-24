@@ -4,11 +4,14 @@ namespace Firmeza.Domain.Entities;
 
 /// <summary>
 /// Entidad de dominio que representa a un Cliente / Comprador en el sistema.
-/// Modela los datos personales, credenciales, estado y relación 1:N con una empresa (.NET 10).
+/// Modela los datos personales, identificación fiscal, credenciales, estado y relación 1:N con una empresa (.NET 10).
 /// </summary>
 public class Client
 {
     public int Id { get; set; }
+
+    // Identificación oficial (Cédula / NIT / Documento único)
+    public string DocumentNumber { get; set; } = string.Empty;
 
     // Datos personales
     public string FirstName { get; set; } = string.Empty;
@@ -24,13 +27,13 @@ public class Client
     public bool IsActive { get; set; } = true;
 
     // Relación 1:N con Enterprise:
-    // Un cliente puede estar vinculado a una ferretería/empresa o actuar como cliente independiente.
     public int? EnterpriseId { get; set; }
     public Enterprise? Enterprise { get; set; }
 
-    // ==========================================
+    // Historial de compras (1:N)
+    public ICollection<Sale> Sales { get; set; } = [];
+
     // Vínculo 1:1 con ASP.NET Core Identity
-    // ==========================================
     public string? UserId { get; set; }
     public ApplicationUser? User { get; set; }
 }

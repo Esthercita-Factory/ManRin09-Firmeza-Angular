@@ -20,7 +20,7 @@ public record SaleDetailResponseDto(
 /// </summary>
 public record SaleResponseDto(
     int Id,
-    int ClientId,
+    int? ClientId,
     string ClientName,
     int Quantity,
     decimal TotalAmount,
@@ -53,9 +53,10 @@ public record CreateSaleItemRequestDto
 /// </summary>
 public record CreateSaleRequestDto
 {
-    [Required(ErrorMessage = "El identificador del cliente es obligatorio.")]
-    [Range(1, int.MaxValue, ErrorMessage = "El identificador del cliente debe ser válido.")]
-    public int ClientId { get; init; }
+    /// <summary>
+    /// Identificador del cliente. Opcional si la venta es a Consumidor Final (AC-CLI-02).
+    /// </summary>
+    public int? ClientId { get; init; }
 
     [Required(ErrorMessage = "Debe incluir al menos un producto en la venta.")]
     [MinLength(1, ErrorMessage = "Debe incluir al menos un producto en la venta.")]

@@ -56,6 +56,32 @@ public class ProductsController(
         return "Administrador";
     }
 
+    private async Task<string> ResolveRegisteredByNameCachedAsync(
+        Product p,
+        Dictionary<Guid, string> cache,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(p.LastMovement) && p.LastMovement != "Reciente")
+        {
+            return p.LastMovement;
+        }
+
+        if (!p.RegisteredById.HasValue)
+        {
+            return "Administrador";
+        }
+
+        var regId = p.RegisteredById.Value;
+        if (cache.TryGetValue(regId, out var cachedName))
+        {
+            return cachedName;
+        }
+
+        var resolved = await ResolveRegisteredByNameAsync(p, cancellationToken);
+        cache[regId] = resolved;
+        return resolved;
+    }
+
     private static ProductResponseDto MapToDto(Product p, string registeredByName) => new(
         p.Id,
         p.Sku,
@@ -64,6 +90,7 @@ public class ProductsController(
         p.Description,
         p.Category,
         p.CategoryDetail,
+        p.UnitOfMeasure,
         p.Location,
         p.CostPrice,
         p.Price,
@@ -80,23 +107,73 @@ public class ProductsController(
     );
 
     /// <summary>
-    /// Obtiene el catálogo completo de productos (público para el e-commerce).
+    /// Obtiene el catálogo de productos (público para e-commerce y panel administrativo).
+    /// Si se proporcionan filtros, filtra los resultados de forma eficiente.
+    /// Para paginación formal en servidor, utilice el endpoint /api/products/paged.
     /// </summary>
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(IEnumerable<ProductResponseDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] ProductFilterDto? filter,
+        CancellationToken cancellationToken)
     {
-        var products = await productRepository.GetAllAsync(cancellationToken);
+        IEnumerable<Product> products;
+        if (filter is not null && (!string.IsNullOrWhiteSpace(filter.Search) ||
+                                   !string.IsNullOrWhiteSpace(filter.Category) ||
+                                   filter.MinPrice.HasValue ||
+                                   filter.MaxPrice.HasValue ||
+                                   filter.InStockOnly.HasValue ||
+                                   filter.EnterpriseId.HasValue))
+        {
+            // Usar filtro con tamaño amplio para mantener compatibilidad de colección
+            var filterAll = filter with { Page = 1, PageSize = 1000 };
+            var paged = await productRepository.GetPagedAsync(filterAll, cancellationToken);
+            products = paged.Items;
+        }
+        else
+        {
+            products = await productRepository.GetAllAsync(cancellationToken);
+        }
+
+        var nameCache = new Dictionary<Guid, string>();
         var response = new List<ProductResponseDto>();
 
         foreach (var p in products)
         {
-            var regName = await ResolveRegisteredByNameAsync(p, cancellationToken);
+            var regName = await ResolveRegisteredByNameCachedAsync(p, nameCache, cancellationToken);
             response.Add(MapToDto(p, regName));
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Obtiene el catálogo de productos con paginación y filtros en el servidor.
+    /// Soporta búsqueda por texto (nombre, SKU, código de barras), categoría, rango de precios y disponibilidad.
+    /// </summary>
+    [HttpGet("paged")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PagedResultDto<ProductResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] ProductFilterDto filter,
+        CancellationToken cancellationToken)
+    {
+        var pagedResult = await productRepository.GetPagedAsync(filter, cancellationToken);
+        var nameCache = new Dictionary<Guid, string>();
+        var items = new List<ProductResponseDto>(pagedResult.Items.Count);
+
+        foreach (var p in pagedResult.Items)
+        {
+            var regName = await ResolveRegisteredByNameCachedAsync(p, nameCache, cancellationToken);
+            items.Add(MapToDto(p, regName));
+        }
+
+        return Ok(new PagedResultDto<ProductResponseDto>(
+            items,
+            pagedResult.TotalCount,
+            pagedResult.Page,
+            pagedResult.PageSize));
     }
 
     /// <summary>
@@ -182,6 +259,22 @@ public class ProductsController(
             return BadRequest(new { message = $"Ya existe un producto registrado con el nombre '{request.Name}'." });
         }
 
+        // Reglas de negocio Firmeza (AC-PROD-02 y AC-PROD-03)
+        if (request.Price <= 0)
+        {
+            return BadRequest(new { message = "El precio de venta debe ser mayor a cero." });
+        }
+
+        if (request.Price < request.CostPrice)
+        {
+            return BadRequest(new { message = $"El precio de venta (${request.Price:F2}) no puede ser menor al precio de costo (${request.CostPrice:F2}) sin autorización explícita." });
+        }
+
+        if (request.Stock < 0)
+        {
+            return BadRequest(new { message = "El stock inicial no puede ser negativo." });
+        }
+
         // 2. Creamos la entidad de dominio
         var product = new Product
         {
@@ -192,6 +285,7 @@ public class ProductsController(
             Description = request.Description ?? string.Empty,
             Category = string.IsNullOrWhiteSpace(request.Category) ? "General" : request.Category,
             CategoryDetail = request.CategoryDetail ?? string.Empty,
+            UnitOfMeasure = string.IsNullOrWhiteSpace(request.UnitOfMeasure) ? "Unidad" : request.UnitOfMeasure,
             Location = request.Location,
             CostPrice = request.CostPrice,
             Price = request.Price,
@@ -215,6 +309,7 @@ public class ProductsController(
     /// La empresa y el usuario responsable se resuelven desde el token JWT; nunca se aceptan desde el body.
     /// Validaciones: DataAnnotations del DTO (400), tamaño máximo 10 MB (413) y rol distinto de Client (403, middleware).
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator")]
     [HttpPost("bulk-import")]
     [RequestSizeLimit(10 * 1024 * 1024)]
     [ProducesResponseType(typeof(BulkImportResultDto), StatusCodes.Status200OK)]
@@ -290,7 +385,9 @@ public class ProductsController(
 
     /// <summary>
     /// Actualiza los datos de un producto existente.
+    /// Exclusivo para administradores o cuenta empresa.
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator")]
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ProductResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -307,12 +404,29 @@ public class ProductsController(
             return NotFound(new { message = $"No se encontró el producto con ID {id}." });
         }
 
+        // Reglas de negocio Firmeza (AC-PROD-02 y AC-PROD-03)
+        if (request.Price <= 0)
+        {
+            return BadRequest(new { message = "El precio de venta debe ser mayor a cero." });
+        }
+
+        if (request.Price < request.CostPrice)
+        {
+            return BadRequest(new { message = $"El precio de venta (${request.Price:F2}) no puede ser menor al precio de costo (${request.CostPrice:F2}) sin autorización explícita." });
+        }
+
+        if (request.Stock < 0)
+        {
+            return BadRequest(new { message = "El stock de un producto no puede ser negativo." });
+        }
+
         product.Sku = string.IsNullOrWhiteSpace(request.Sku) ? product.Sku : request.Sku;
         product.Barcode = request.Barcode ?? product.Barcode;
         product.Name = request.Name;
         product.Description = request.Description ?? string.Empty;
         product.Category = request.Category;
         product.CategoryDetail = request.CategoryDetail ?? string.Empty;
+        product.UnitOfMeasure = string.IsNullOrWhiteSpace(request.UnitOfMeasure) ? product.UnitOfMeasure : request.UnitOfMeasure;
         product.Location = request.Location;
         product.CostPrice = request.CostPrice;
         product.Price = request.Price;
@@ -330,7 +444,9 @@ public class ProductsController(
 
     /// <summary>
     /// Elimina un producto del inventario.
+    /// Exclusivo para administradores o cuenta empresa.
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator")]
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

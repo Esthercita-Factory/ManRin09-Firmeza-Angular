@@ -1,5 +1,6 @@
 import { useStore } from '../context/StoreContext';
-import { ArrowLeft, Building2, Package, Minus, Plus, Trash2, CreditCard, Check } from 'lucide-react';
+import { api } from '../services/api';
+import { ArrowLeft, Building2, Package, Minus, Plus, Trash2, CreditCard, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface CartViewProps {
@@ -10,18 +11,38 @@ interface CartViewProps {
 export function CartView({ onBack, onGoToLogin }: CartViewProps) {
   const { cart, updateCartQuantity, removeFromCart, clearCart, cartTotal, cartItemCount, user } = useStore();
   const [orderDone, setOrderDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleConfirmOrder = () => {
+  const handleConfirmOrder = async () => {
     if (!user) {
       onGoToLogin();
       return;
     }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    const items = cart.map(item => ({
+      productId: item.product.id,
+      quantity: item.quantity,
+      unitPrice: item.product.price
+    }));
+
+    const result = await api.checkout(items, user.token, 'Tarjeta / Pasarela');
+    setSubmitting(false);
+
+    if (!result.success) {
+      setErrorMessage(result.message || 'Error al procesar el pedido en el servidor.');
+      return;
+    }
+
     setOrderDone(true);
     clearCart();
     setTimeout(() => {
       setOrderDone(false);
       onBack();
-    }, 3500);
+    }, 4000);
   };
 
   return (
@@ -162,12 +183,29 @@ export function CartView({ onBack, onGoToLogin }: CartViewProps) {
               </div>
             )}
 
+            {errorMessage && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-xl text-xs text-red-400 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             <button
               onClick={handleConfirmOrder}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+              disabled={submitting}
+              className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-sm rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center justify-center gap-2"
             >
-              <CreditCard className="w-4 h-4" />
-              {user ? 'Confirmar y Enviar Pedido' : 'Iniciar Sesión para Pedir'}
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Procesando Pedido...</span>
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4" />
+                  <span>{user ? 'Confirmar y Enviar Pedido' : 'Iniciar Sesión para Pedir'}</span>
+                </>
+              )}
             </button>
           </div>
         </div>

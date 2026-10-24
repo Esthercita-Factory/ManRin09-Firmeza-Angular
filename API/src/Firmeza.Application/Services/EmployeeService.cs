@@ -8,7 +8,9 @@ namespace Firmeza.Application.Services;
 /// Servicio de aplicación que orquesta la gestión y ciclo de vida de los empleados.
 /// Maneja las validaciones de negocio, unicidad de documento y pertenencia a la empresa.
 /// </summary>
-public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployeeService
+public class EmployeeService(
+    IEmployeeRepository employeeRepository,
+    IPasswordHasher passwordHasher) : IEmployeeService
 {
     public async Task<IEnumerable<EmployeeResponseDto>> GetAllAsync(int enterpriseId, CancellationToken cancellationToken = default)
     {
@@ -37,12 +39,15 @@ public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployee
             throw new InvalidOperationException($"El documento de identidad '{cleanDocument}' ya se encuentra registrado por otro colaborador.");
         }
 
+        var initialPassword = !string.IsNullOrWhiteSpace(request.Password) ? request.Password : cleanDocument;
+
         var employee = new Employee
         {
             DocumentNumber = cleanDocument,
             FullName = request.FullName.Trim(),
             Phone = request.Phone?.Trim() ?? string.Empty,
             Role = string.IsNullOrWhiteSpace(request.Role) ? "Operador" : request.Role.Trim(),
+            PasswordHash = passwordHasher.Hash(initialPassword),
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow,
             EnterpriseId = enterpriseId
@@ -68,6 +73,10 @@ public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployee
         if (!string.IsNullOrWhiteSpace(request.Role))
         {
             employee.Role = request.Role.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            employee.PasswordHash = passwordHasher.Hash(request.NewPassword);
         }
         employee.IsActive = request.IsActive;
 

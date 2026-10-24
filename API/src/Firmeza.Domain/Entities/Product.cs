@@ -39,6 +39,11 @@ public class Product
     public string CategoryDetail { get; set; } = string.Empty;
 
     /// <summary>
+    /// Unidad de medida del material/artículo (ej: Bolsa, Unidad, Metro, Kg, Galón, Caja).
+    /// </summary>
+    public string UnitOfMeasure { get; set; } = "Unidad";
+
+    /// <summary>
     /// Ubicación física del producto en el almacén (ej: Nave A-P03-R2).
     /// </summary>
     public string Location { get; set; } = string.Empty;
@@ -89,6 +94,11 @@ public class Product
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Token de concurrencia optimista para evitar sobreescritura accidental o stock negativo.
+    /// </summary>
+    public uint Version { get; set; }
 
     public int StockTotal => Stock;
     public int StockAvailable => Math.Max(0, Stock - StockReserved);

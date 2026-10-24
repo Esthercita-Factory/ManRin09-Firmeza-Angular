@@ -29,8 +29,9 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .IsRequired();
 
         builder.HasOne(s => s.Client)
-            .WithMany()
+            .WithMany(c => c.Sales)
             .HasForeignKey(s => s.ClientId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

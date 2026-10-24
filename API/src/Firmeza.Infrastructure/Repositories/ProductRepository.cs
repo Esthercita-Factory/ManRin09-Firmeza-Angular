@@ -1,3 +1,4 @@
+using Firmeza.Application.DTOs;
 using Firmeza.Application.Interfaces;
 using Firmeza.Domain.Entities;
 using Firmeza.Infrastructure.DbContext;
@@ -34,6 +35,59 @@ public class ProductRepository(ApplicationDbContext context) : IProductRepositor
             .Include(p => p.Enterprise)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
+    }
+
+    public async Task<PagedResultDto<Product>> GetPagedAsync(ProductFilterDto filter, CancellationToken ct = default)
+    {
+        var query = context.Products
+            .AsNoTracking()
+            .Include(p => p.Enterprise)
+            .AsQueryable();
+
+        if (filter.EnterpriseId.HasValue)
+        {
+            query = query.Where(p => p.EnterpriseId == filter.EnterpriseId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim().ToUpper();
+            query = query.Where(p =>
+                p.Name.ToUpper().Contains(search) ||
+                p.Sku.ToUpper().Contains(search) ||
+                p.Barcode.ToUpper().Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            var category = filter.Category.Trim().ToUpper();
+            query = query.Where(p => p.Category.ToUpper() == category);
+        }
+
+        if (filter.MinPrice.HasValue)
+        {
+            query = query.Where(p => p.Price >= filter.MinPrice.Value);
+        }
+
+        if (filter.MaxPrice.HasValue)
+        {
+            query = query.Where(p => p.Price <= filter.MaxPrice.Value);
+        }
+
+        if (filter.InStockOnly.HasValue && filter.InStockOnly.Value)
+        {
+            query = query.Where(p => p.Stock > 0);
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(ct);
+
+        return new PagedResultDto<Product>(items, totalCount, filter.Page, filter.PageSize);
     }
 
     public async Task<IEnumerable<Product>> GetByRegisteredByIdAsync(Guid employeeId, CancellationToken ct = default)

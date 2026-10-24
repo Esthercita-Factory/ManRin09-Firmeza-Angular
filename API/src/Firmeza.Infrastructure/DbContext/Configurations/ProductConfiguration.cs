@@ -12,8 +12,17 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.HasKey(p => p.Id);
 
+        // Token de concurrencia optimista para proteger el stock
+        builder.Property(p => p.Version)
+            .IsRowVersion();
+
         builder.Property(p => p.Sku)
+            .IsRequired()
             .HasMaxLength(100);
+
+        // SKU único por empresa
+        builder.HasIndex(p => new { p.EnterpriseId, p.Sku })
+            .IsUnique();
 
         builder.Property(p => p.Barcode)
             .HasMaxLength(100);
@@ -30,6 +39,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.CategoryDetail)
             .HasMaxLength(100);
+
+        builder.Property(p => p.UnitOfMeasure)
+            .IsRequired()
+            .HasMaxLength(30)
+            .HasDefaultValue("Unidad");
 
         builder.Property(p => p.Location)
             .HasMaxLength(100);
@@ -55,7 +69,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasDefaultValue(true);
 
         builder.Property(p => p.RegisteredById)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(p => p.CreatedAt)
             .IsRequired()
@@ -72,7 +86,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired(false);
 
         // Índices de búsqueda
-        builder.HasIndex(p => p.Sku);
         builder.HasIndex(p => p.Name);
         builder.HasIndex(p => p.EnterpriseId);
     }

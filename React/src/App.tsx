@@ -7,12 +7,13 @@ import { ProductDetailView } from './views/ProductDetailView';
 import { CartView } from './views/CartView';
 import { StoresView } from './views/StoresView';
 import { LoginView } from './views/LoginView';
+import { OrdersView } from './views/OrdersView';
 import { productsService } from './services/products.service';
 import { plansService } from './services/plans.service';
 import type { Product, Plan } from './types';
 
 function MainApp() {
-  const [currentPage, setCurrentPage] = useState<'catalog' | 'product-detail' | 'cart' | 'stores' | 'login'>('catalog');
+  const [currentPage, setCurrentPage] = useState<'catalog' | 'product-detail' | 'cart' | 'stores' | 'login' | 'orders'>('catalog');
   const [products, setProducts] = useState<Product[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +92,13 @@ function MainApp() {
         <LoginView 
           onBack={() => setCurrentPage('catalog')}
           onSuccess={() => setCurrentPage('catalog')}
+        />
+      )}
+
+      {currentPage === 'orders' && (
+        <OrdersView 
+          onBack={() => setCurrentPage('catalog')}
+          onGoToCatalog={() => setCurrentPage('catalog')}
         />
       )}
 

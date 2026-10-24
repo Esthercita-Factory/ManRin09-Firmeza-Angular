@@ -1,4 +1,4 @@
-using Firmeza.Application.Common.Interfaces;
+﻿using Firmeza.Application.Common.Interfaces;
 using Firmeza.Application.DTOs;
 using Firmeza.Application.Interfaces;
 using Firmeza.Domain.Entities;
@@ -268,7 +268,33 @@ public class AuthService(
 
             var employeeRole = string.IsNullOrWhiteSpace(employee.Role) ? "Employee" : employee.Role;
             var employeeEmail = $"{cleanDocument}@firmeza.internal";
-            var employeeToken = jwtTokenGenerator.GenerateToken(employee.Id.ToString(), employeeEmail, "Employee");
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                throw new UnauthorizedAccessException("La contraseña es obligatoria.");
+            }
+
+            var isPasswordValid = false;
+            if (!string.IsNullOrWhiteSpace(employee.PasswordHash))
+            {
+                isPasswordValid = passwordHasher.Verify(request.Password, employee.PasswordHash);
+            }
+            else
+            {
+                // Compatibilidad: si el empleado fue registrado antes de exigir contraseña, su clave inicial es su documento
+                if (request.Password.Trim() == cleanDocument)
+                {
+                    isPasswordValid = true;
+                    employee.PasswordHash = passwordHasher.Hash(request.Password.Trim());
+                    await employeeRepository.UpdateAsync(employee, cancellationToken);
+                }
+            }
+
+            if (!isPasswordValid)
+            {
+                throw new UnauthorizedAccessException("Credenciales inválidas.");
+            }
+            var employeeToken = jwtTokenGenerator.GenerateToken(employee.Id.ToString(), employeeEmail, employeeRole);
             var employeeExpiration = DateTime.UtcNow.AddHours(8);
 
             return new AuthResponseDto(
@@ -313,14 +339,6 @@ public class AuthService(
         // 3. Obtener roles para el token JWT
         var roles = await userManager.GetRolesAsync(user);
         var primaryRole = roles.FirstOrDefault() ?? "Client";
-
-        // VALIDACIÓN: Los clientes no tienen permitido autenticarse en esta plataforma
-        if (primaryRole.Equals("Client", StringComparison.OrdinalIgnoreCase) ||
-            roles.Any(r => r.Equals("Client", StringComparison.OrdinalIgnoreCase)) ||
-            await clientRepository.ExistsByEmailAsync(cleanEmail))
-        {
-            throw new UnauthorizedAccessException("Credenciales inválidas.");
-        }
 
         // 4. Generar token
         var token = jwtTokenGenerator.GenerateToken(user.Id, user.Email!, primaryRole);

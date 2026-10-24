@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Firmeza.Application.DTOs;
 using Firmeza.Application.Interfaces;
+using Firmeza.Domain.Entities;
 using Firmeza.Domain.Entities.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -19,6 +20,7 @@ namespace Firmeza.Api.Controllers;
 public class SaleController(
     UserManager<ApplicationUser> userManager,
     IEmployeeRepository employeeRepository,
+    IClientRepository clientRepository,
     ISaleService saleService) : ControllerBase
 {
     private async Task<string> ResolveScheduledByNameAsync(CancellationToken cancellationToken)
@@ -62,7 +64,9 @@ public class SaleController(
 
     /// <summary>
     /// Obtiene el listado completo de ventas registradas en el sistema junto a sus productos.
+    /// Exclusivo para personal administrativo, ventas y caja.
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator,Seller,Cashier")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<SaleResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
@@ -89,8 +93,45 @@ public class SaleController(
     }
 
     /// <summary>
-    /// Obtiene el historial de ventas asociadas a un cliente específico.
+    /// Obtiene el historial de compras del cliente autenticado (AC-CLI-03).
+    /// Resuelve el cliente a partir del correo o UserId en los claims del token.
     /// </summary>
+    [HttpGet("my-purchases")]
+    [ProducesResponseType(typeof(IEnumerable<SaleResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyPurchases(CancellationToken cancellationToken)
+    {
+        var email = User.FindFirstValue(ClaimTypes.Email)
+            ?? User.FindFirstValue("email")
+            ?? User.Identity?.Name;
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        Client? client = null;
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            client = await clientRepository.GetByUserIdAsync(userId);
+        }
+
+        if (client is null && !string.IsNullOrWhiteSpace(email))
+        {
+            client = await clientRepository.GetByEmailAsync(email);
+        }
+
+        if (client is null)
+        {
+            return Ok(Array.Empty<SaleResponseDto>());
+        }
+
+        var sales = await saleService.GetByClientIdAsync(client.Id, cancellationToken);
+        return Ok(sales);
+    }
+
+    /// <summary>
+    /// Obtiene el historial de ventas asociadas a un cliente específico.
+    /// Exclusivo para personal administrativo, ventas y caja.
+    /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator,Seller,Cashier")]
     [HttpGet("client/{clientId:int}")]
     [ProducesResponseType(typeof(IEnumerable<SaleResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByClientId(int clientId, CancellationToken cancellationToken)
@@ -118,7 +159,9 @@ public class SaleController(
 
     /// <summary>
     /// Actualiza los datos o estado general de una venta existente.
+    /// Exclusivo para administradores o cuenta empresa.
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator")]
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(SaleResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -156,7 +199,9 @@ public class SaleController(
 
     /// <summary>
     /// Elimina un registro de venta revirtiendo automáticamente el stock al inventario.
+    /// Exclusivo para administradores o cuenta empresa.
     /// </summary>
+    [Authorize(Roles = "Enterprise,Administrator")]
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

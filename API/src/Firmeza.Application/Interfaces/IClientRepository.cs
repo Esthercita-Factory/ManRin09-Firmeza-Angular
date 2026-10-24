@@ -6,6 +6,7 @@ public interface IClientRepository
 {
     Task<Client?> GetByIdAsync(int id);
     Task<Client?> GetByEmailAsync(string email);
+    Task<Client?> GetByUserIdAsync(string userId);
     Task<bool> ExistsByEmailAsync(string email);
     Task AddAsync(Client client);
 }

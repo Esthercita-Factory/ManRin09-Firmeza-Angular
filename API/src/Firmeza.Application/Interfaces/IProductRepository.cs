@@ -1,3 +1,4 @@
+using Firmeza.Application.DTOs;
 using Firmeza.Domain.Entities;
 
 namespace Firmeza.Application.Interfaces;
@@ -8,6 +9,7 @@ public interface IProductRepository
     Task<Product?> GetByNameAsync(string name, CancellationToken ct = default);
     Task<bool> ExistsByNameAsync(string name, CancellationToken ct = default);
     Task<IEnumerable<Product>> GetAllAsync(CancellationToken ct = default);
+    Task<PagedResultDto<Product>> GetPagedAsync(ProductFilterDto filter, CancellationToken ct = default);
     Task<IEnumerable<Product>> GetByRegisteredByIdAsync(Guid employeeId, CancellationToken ct = default);
     Task AddAsync(Product product, CancellationToken ct = default);
     Task UpdateAsync(Product product, CancellationToken ct = default);

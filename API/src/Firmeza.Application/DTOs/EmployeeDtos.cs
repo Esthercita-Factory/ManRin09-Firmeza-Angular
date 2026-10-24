@@ -36,6 +36,9 @@ public record CreateEmployeeRequestDto
     public string Role { get; init; } = "Operador";
 
     public bool IsActive { get; init; } = true;
+
+    [MinLength(6, ErrorMessage = "La contraseña debe contener al menos 6 caracteres.")]
+    public string? Password { get; init; }
 }
 
 /// <summary>
@@ -54,4 +57,7 @@ public record UpdateEmployeeRequestDto
     public string Role { get; init; } = string.Empty;
 
     public bool IsActive { get; init; } = true;
+
+    [MinLength(6, ErrorMessage = "La nueva contraseña debe contener al menos 6 caracteres.")]
+    public string? NewPassword { get; init; }
 }

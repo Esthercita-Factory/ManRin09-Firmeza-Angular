@@ -72,6 +72,8 @@ builder.Services.AddScoped<IClientRepository, ClientRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISaleRepository, SaleRepository>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<IPurchaseRepository, PurchaseRepository>();
 
 // Servicios de aplicación e infraestructura
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -82,6 +84,8 @@ builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddSingleton<IProductService, ProductService>();
 builder.Services.AddScoped<IProductBulkImportService, ProductBulkImportService>();
 
@@ -130,7 +134,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    string[] roles = ["Enterprise", "Client", "Employee"];
+    string[] roles = ["Enterprise", "Client", "Employee", "Administrator", "Seller", "Cashier"];
     foreach (var role in roles)
     {
         if (!await roleManager.RoleExistsAsync(role))

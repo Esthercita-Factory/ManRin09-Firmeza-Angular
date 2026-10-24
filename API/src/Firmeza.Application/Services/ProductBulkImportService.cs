@@ -163,6 +163,7 @@ public class ProductBulkImportService(IProductRepository productRepository) : IP
         Category = row.Category,
         CategoryDetail = string.Empty,
         Location = row.Location ?? DefaultLocation,
+        UnitOfMeasure = string.IsNullOrWhiteSpace(row.UnitOfMeasure) ? "Unidad" : row.UnitOfMeasure.Trim(),
         CostPrice = row.CostPrice,
         Price = row.SalePrice,
         Stock = row.Stock,
